@@ -71,6 +71,7 @@ export class Clock {
 
   /**
    * Create a brand new Merkle Clock with no event history.
+   * @template {import('multiformats').Link} T
    * @param {import('./block').BlockFetcher} blocks Block storage.
    * @param {T} data
    */
@@ -82,22 +83,22 @@ export class Clock {
 
 /**
  * @template {import('multiformats').Link} T
- * @implements {EventView}
+ * @implements {EventView<T>}
  */
 export class Event {
   /** @type {T} */
   #data
 
-  /** @type {EventView<T>[]} */
+  /** @type {EventLink<T>[]} */
   #parents
 
   /**
    * @param {T} data
-   * @param {EventView<T>[]} [parent]
+   * @param {EventLink<T>[]} [parents]
    */
   constructor (data, parents) {
     this.#data = data
-    this.#parents = parents
+    this.#parents = parents ?? []
   }
 
   get data () {
@@ -112,10 +113,11 @@ export class Event {
 /**
  * @template {import('multiformats').Link} T
  * @param {EventView<T>} value
- * @returns {Promise<EventBlockView>}
+ * @returns {Promise<EventBlockView<T>>}
  */
 export async function encodeEventBlock (value) {
   // TODO: sort parents
   const { cid, bytes } = await encode({ value, codec: cbor, hasher: sha256 })
+  // @ts-expect-error
   return new Block({ cid, value, bytes })
 }
