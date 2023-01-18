@@ -3,40 +3,45 @@ import { sha256 } from 'multiformats/hashes/sha2'
 import * as cbor from '@ipld/dag-cbor'
 
 /**
- * @template {import('multiformats').Link} T
- * @typedef {EventLink<T>[]} Head
- */
-
-/**
- * @template {import('multiformats').Link} T
+ * @template {import('./link').AnyLink} T
  * @typedef {{ parents: EventLink<T>[], data: T }} EventView
  */
 
 /**
- * @template {import('multiformats').Link} T
+ * @template {import('./link').AnyLink} T
  * @typedef {import('multiformats').BlockView<EventView<T>>} EventBlockView
  */
 
 /**
- * @template {import('multiformats').Link} T
+ * @template {import('./link').AnyLink} T
  * @typedef {import('multiformats').Link<EventView<T>>} EventLink
  */
 
-/** @template {import('multiformats').Link} T */
+/**
+ * A Merkle Clock implementation.
+ *
+ * Usage:
+ * ```js
+ * const clock = new Clock(blocks)
+ * const event = await EventBlock.create(dataCID, clock.head)
+ * await blocks.put(event.cid, event.bytes)
+ * await clock.advance(event.cid)
+ * ```
+ * @template {import('./link').AnyLink} T
+ */
 export class Clock {
   /** @type {EventFetcher} */
   #events
 
-  /** @type {Head<T>} */
+  /** @type {EventLink<T>[]} */
   #head
 
   /**
    * Instantiate a new Merkle Clock with the passed head.
    * @param {import('./block').BlockFetcher} blocks Block storage.
-   * @param {Head<T>} [head]
+   * @param {EventLink<T>[]} [head]
    */
   constructor (blocks, head) {
-    if (!head) throw new Error('missing head information')
     this.#events = new EventFetcher(blocks)
     this.#head = head ?? []
   }
@@ -47,62 +52,66 @@ export class Clock {
 
   /**
    * Advance the clock by adding an event.
-   * @param {EventView<T>} event
+   * @param {EventLink<T>} event
    */
   async advance (event) {
-    if (!event.parents.length) throw new Error('missing event parent(s)')
+    const head = new Map(this.#head.map(cid => [cid.toString(), cid]))
+    if (head.has(event.toString())) return
 
-    const block = await encodeEventBlock(event)
-    if (this.#head.some(l => l.toString() === block.cid.toString())) {
+    // does event contain the clock?
+    let changed = false
+    for (const cid of this.#head) {
+      if (await contains(this.#events, event, cid)) {
+        head.delete(cid.toString())
+        head.set(event.toString(), event)
+        changed = true
+      }
+    }
+    if (changed) {
+      this.#head = [...head.values()]
       return
     }
 
-    for (const [i, p] of this.#head.entries()) {
-      if (await contains(this.#events, block.cid, p)) {
-        this.#head[i] = block.cid
-        // TODO: what about the other entries?
-        return block
-      }
-      if (await contains(this.#events, p, block.cid)) {
+    // does clock contain the event?
+    for (const p of this.#head) {
+      if (await contains(this.#events, p, event)) {
         return
       }
     }
 
-    this.#head.push(block.cid)
-    return block
+    this.#head.push(event)
   }
 }
 
 /**
- * @template {import('multiformats').Link} T
- * @implements {EventView<T>}
+ * @template {import('./link').AnyLink} T
+ * @implements {EventBlockView<T>}
  */
-export class Event {
-  /** @type {T} */
-  #data
-
-  /** @type {EventLink<T>[]} */
-  #parents
+export class EventBlock extends Block {
+  /**
+   * @param {object} config
+   * @param {EventLink<T>} config.cid
+   * @param {Event} config.value
+   * @param {Uint8Array} config.bytes
+   * @param {string} config.prefix
+   */
+  constructor ({ cid, value, bytes, prefix }) {
+    // @ts-expect-error
+    super({ cid, value, bytes })
+    this.prefix = prefix
+  }
 
   /**
+   * @template {import('./link').AnyLink} T
    * @param {T} data
    * @param {EventLink<T>[]} [parents]
    */
-  constructor (data, parents) {
-    this.#data = data
-    this.#parents = parents ?? []
-  }
-
-  get data () {
-    return this.#data
-  }
-
-  get parents () {
-    return this.#parents
+  static create (data, parents) {
+    return encodeEventBlock({ data, parents: parents ?? [] })
   }
 }
 
-/** @template {import('multiformats').Link} T */
+/** @template {import('./link').AnyLink} T */
 export class EventFetcher {
   /** @param {import('./block').BlockFetcher} blocks */
   constructor (blocks) {
@@ -122,7 +131,7 @@ export class EventFetcher {
 }
 
 /**
- * @template {import('multiformats').Link} T
+ * @template {import('./link').AnyLink} T
  * @param {EventView<T>} value
  * @returns {Promise<EventBlockView<T>>}
  */
@@ -134,20 +143,19 @@ export async function encodeEventBlock (value) {
 }
 
 /**
- * @template {import('multiformats').Link} T
+ * @template {import('./link').AnyLink} T
  * @param {Uint8Array} bytes
  * @returns {Promise<EventBlockView<T>>}
  */
 export async function decodeEventBlock (bytes) {
   const { cid, value } = await decode({ bytes, codec: cbor, hasher: sha256 })
-  if (!Array.isArray(value)) throw new Error(`invalid shard: ${cid}`)
   // @ts-expect-error
   return new Block({ cid, value, bytes })
 }
 
 /**
  * Returns true if event "a" contains event "b". Breadth first search.
- * @template {import('multiformats').Link} T
+ * @template {import('./link').AnyLink} T
  * @param {EventFetcher} events
  * @param {EventLink<T>} a
  * @param {EventLink<T>} b
@@ -168,3 +176,38 @@ async function contains (events, a, b) {
   }
   return false
 }
+
+/**
+ * @template {import('./link').AnyLink} T
+ * @param {import('./block').BlockFetcher} blocks Block storage.
+ * @param {EventLink<T>[]} head
+ */
+export async function * vis (blocks, head) {
+  const events = new EventFetcher(blocks)
+  yield 'digraph clock {'
+  yield '  node [shape=point]; head;'
+  const hevents = await Promise.all(head.map(link => events.get(link)))
+  const links = []
+  for (const e of hevents) {
+    yield `  node [shape=oval]; ${e.cid} [label="${shortLink(e.value.data)}"];`
+    yield `  head -> ${e.cid} [label="${shortLink(e.cid)}"];`
+    for (const p of e.value.parents) {
+      yield `  ${e.cid} -> ${p} [label="${shortLink(p)}"];`
+    }
+    links.push(...e.value.parents)
+  }
+  while (links.length) {
+    const link = links.shift()
+    if (!link) break
+    const block = await events.get(link)
+    yield `  node [shape=oval]; ${link} [label="${shortLink(block.value.data)}"];`
+    for (const p of block.value.parents) {
+      yield `  ${link} -> ${p} [label="${shortLink(p)}"];`
+    }
+    links.push(...block.value.parents)
+  }
+  yield '}'
+}
+
+/** @param {import('./link').AnyLink} l */
+const shortLink = l => `${String(l).slice(0, 4)}..${String(l).slice(-4)}`
