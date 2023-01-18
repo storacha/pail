@@ -146,7 +146,7 @@ export async function decodeEventBlock (bytes) {
 }
 
 /**
- * Returns true if event a contains event b. Breadth first search.
+ * Returns true if event "a" contains event "b". Breadth first search.
  * @template {import('multiformats').Link} T
  * @param {EventFetcher} events
  * @param {EventLink<T>} a
@@ -154,12 +154,15 @@ export async function decodeEventBlock (bytes) {
  */
 async function contains (events, a, b) {
   if (a.toString() === b.toString()) return true
-  const { value: event } = await events.get(a)
-  const links = [...event.parents]
+  const [{ value: aevent }, { value: bevent }] = await Promise.all([events.get(a), events.get(b)])
+  const links = [...aevent.parents]
   while (links.length) {
     const link = links.shift()
     if (!link) break
     if (link.toString() === b.toString()) return true
+    // if any of b's parents are this link, then b cannot exist in any of the
+    // tree below, since that would create a cycle.
+    if (bevent.parents.some(p => link.toString() === p.toString())) continue
     const { value: event } = await events.get(link)
     links.push(...event.parents)
   }
