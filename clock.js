@@ -201,15 +201,14 @@ export async function * vis (blocks, head) {
   while (links.length) {
     const link = links.shift()
     if (!link) break
+    if (nodes.has(link.toString())) continue
+    nodes.add(link.toString())
     const block = await events.get(link)
-    if (!nodes.has(link.toString())) {
-      nodes.add(link.toString())
-      yield `  node [shape=oval]; ${link} [label="${shortLink(block.value.data)}" fontname="Courier"];`
-      for (const p of block.value.parents) {
-        yield `  ${link} -> ${p} [label="${shortLink(p)}" fontname="Courier"];`
-      }
-      links.push(...block.value.parents)
+    yield `  node [shape=oval]; ${link} [label="${shortLink(block.value.data)}" fontname="Courier"];`
+    for (const p of block.value.parents) {
+      yield `  ${link} -> ${p} [label="${shortLink(p)}" fontname="Courier"];`
     }
+    links.push(...block.value.parents)
   }
   yield '}'
 }
