@@ -79,7 +79,7 @@ export class Clock {
       }
     }
 
-    this.#head.push(event)
+    this.#head = this.#head.concat(event)
   }
 }
 
@@ -185,14 +185,16 @@ async function contains (events, a, b) {
 export async function * vis (blocks, head) {
   const events = new EventFetcher(blocks)
   yield 'digraph clock {'
-  yield '  node [shape=point]; head;'
+  yield '  node [shape=point fontname="Courier"]; head;'
   const hevents = await Promise.all(head.map(link => events.get(link)))
   const links = []
+  const nodes = new Set()
   for (const e of hevents) {
-    yield `  node [shape=oval]; ${e.cid} [label="${shortLink(e.value.data)}"];`
-    yield `  head -> ${e.cid} [label="${shortLink(e.cid)}"];`
+    nodes.add(e.cid.toString())
+    yield `  node [shape=oval fontname="Courier"]; ${e.cid} [label="${shortLink(e.value.data)}"];`
+    yield `  head -> ${e.cid} [label="${shortLink(e.cid)}" fontname="Courier"];`
     for (const p of e.value.parents) {
-      yield `  ${e.cid} -> ${p} [label="${shortLink(p)}"];`
+      yield `  ${e.cid} -> ${p} [label="${shortLink(p)}" fontname="Courier"];`
     }
     links.push(...e.value.parents)
   }
@@ -200,11 +202,14 @@ export async function * vis (blocks, head) {
     const link = links.shift()
     if (!link) break
     const block = await events.get(link)
-    yield `  node [shape=oval]; ${link} [label="${shortLink(block.value.data)}"];`
-    for (const p of block.value.parents) {
-      yield `  ${link} -> ${p} [label="${shortLink(p)}"];`
+    if (!nodes.has(link.toString())) {
+      nodes.add(link.toString())
+      yield `  node [shape=oval]; ${link} [label="${shortLink(block.value.data)}" fontname="Courier"];`
+      for (const p of block.value.parents) {
+        yield `  ${link} -> ${p} [label="${shortLink(p)}" fontname="Courier"];`
+      }
+      links.push(...block.value.parents)
     }
-    links.push(...block.value.parents)
   }
   yield '}'
 }

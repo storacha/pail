@@ -1,4 +1,4 @@
-import { describe, it } from 'node:test'
+import { describe, it } from 'mocha'
 import assert from 'node:assert'
 import { Clock, EventBlock, vis } from '../clock.js'
 import { Blockstore, randomCID } from './helpers.js'
