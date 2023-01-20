@@ -18,69 +18,39 @@ import * as cbor from '@ipld/dag-cbor'
  */
 
 /**
- * A Merkle Clock implementation.
+ * Advance the clock by adding an event.
  *
- * Usage:
- * ```js
- * const clock = new Clock(blocks)
- * const event = await EventBlock.create(dataCID, clock.head)
- * await blocks.put(event.cid, event.bytes)
- * await clock.advance(event.cid)
- * ```
  * @template {import('./link').AnyLink} T
+ * @param {import('./block').BlockFetcher} blocks Block storage.
+ * @param {EventLink<T>[]} head The head of the clock.
+ * @param {EventLink<T>} event The event to add.
  */
-export class Clock {
-  /** @type {EventFetcher} */
-  #events
+export async function advance (blocks, head, event) {
+  const events = new EventFetcher(blocks)
+  const headmap = new Map(head.map(cid => [cid.toString(), cid]))
+  if (headmap.has(event.toString())) return head
 
-  /** @type {EventLink<T>[]} */
-  #head
-
-  /**
-   * Instantiate a new Merkle Clock with the passed head.
-   * @param {import('./block').BlockFetcher} blocks Block storage.
-   * @param {EventLink<T>[]} [head]
-   */
-  constructor (blocks, head) {
-    this.#events = new EventFetcher(blocks)
-    this.#head = head ?? []
+  // does event contain the clock?
+  let changed = false
+  for (const cid of head) {
+    if (await contains(events, event, cid)) {
+      headmap.delete(cid.toString())
+      headmap.set(event.toString(), event)
+      changed = true
+    }
+  }
+  if (changed) {
+    return [...headmap.values()]
   }
 
-  get head () {
-    return this.#head
+  // does clock contain the event?
+  for (const p of head) {
+    if (await contains(events, p, event)) {
+      return head
+    }
   }
 
-  /**
-   * Advance the clock by adding an event.
-   * @param {EventLink<T>} event
-   */
-  async advance (event) {
-    const head = new Map(this.#head.map(cid => [cid.toString(), cid]))
-    if (head.has(event.toString())) return
-
-    // does event contain the clock?
-    let changed = false
-    for (const cid of this.#head) {
-      if (await contains(this.#events, event, cid)) {
-        head.delete(cid.toString())
-        head.set(event.toString(), event)
-        changed = true
-      }
-    }
-    if (changed) {
-      this.#head = [...head.values()]
-      return
-    }
-
-    // does clock contain the event?
-    for (const p of this.#head) {
-      if (await contains(this.#events, p, event)) {
-        return
-      }
-    }
-
-    this.#head = this.#head.concat(event)
-  }
+  return head.concat(event)
 }
 
 /**
