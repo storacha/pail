@@ -5,7 +5,7 @@ import { advance, vis } from '../clock.js'
 import { put } from '../crdt.js'
 import { Blockstore, randomCID } from './helpers.js'
 
-describe.only('CRDT', () => {
+describe('CRDT', () => {
   it('put a value to a new clock', async () => {
     const blocks = new Blockstore()
     const key = 'test'
