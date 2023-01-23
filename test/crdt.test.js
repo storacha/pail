@@ -8,7 +8,7 @@ describe('CRDT', () => {
   it('put a value to a new clock', async () => {
     const blocks = new Blockstore()
     const alice = new TestPail(blocks, [])
-    const key = 'test'
+    const key = 'key'
     const value = await randomCID(32)
     const { event, head } = await alice.putAndVis(key, value)
 
@@ -23,11 +23,11 @@ describe('CRDT', () => {
     const blocks = new Blockstore()
     const alice = new TestPail(blocks, [])
 
-    const key0 = 'test'
+    const key0 = 'key0'
     const value0 = await randomCID(32)
     await alice.put(key0, value0)
 
-    const key1 = 'test1'
+    const key1 = 'key1'
     const value1 = await randomCID(32)
     const result = await alice.putAndVis(key1, value1)
 
@@ -41,15 +41,15 @@ describe('CRDT', () => {
   it('simple parallel put multiple values', async () => {
     const blocks = new Blockstore()
     const alice = new TestPail(blocks, [])
-    await alice.put('test', await randomCID(32))
+    await alice.put('key0', await randomCID(32))
     const bob = new TestPail(blocks, alice.head)
 
     /** @type {Array<[string, import('../link').AnyLink]>} */
     const data = [
-      ['test1', await randomCID(32)],
-      ['test2', await randomCID(32)],
-      ['test3', await randomCID(32)],
-      ['test4', await randomCID(32)]
+      ['key1', await randomCID(32)],
+      ['key2', await randomCID(32)],
+      ['key3', await randomCID(32)],
+      ['key4', await randomCID(32)]
     ]
 
     const { event: aevent0 } = await alice.put(data[0][0], data[0][1])
@@ -118,7 +118,17 @@ class TestPail {
    */
   async putAndVis (key, value) {
     const result = await this.put(key, value)
-    for await (const line of vis(this.blocks, result.head)) console.log(line)
+    /** @param {import('../link').AnyLink} l */
+    const shortLink = l => `${String(l).slice(0, 4)}..${String(l).slice(-4)}`
+    /** @type {(e: import('../clock').EventBlockView<import('../crdt').EventData>) => string} */
+    const renderNodeLabel = event => {
+      return event.value.data.type === 'put'
+        ? `${shortLink(event.cid)}\\nput(${event.value.data.key}, ${shortLink(event.value.data.value)})`
+        : `${shortLink(event.cid)}\\ndel(${event.value.data.key})`
+    }
+    for await (const line of vis(this.blocks, result.head, { renderNodeLabel })) {
+      console.log(line)
+    }
     return result
   }
 
