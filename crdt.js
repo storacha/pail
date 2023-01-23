@@ -16,7 +16,7 @@ import { MemoryBlockstore, MultiBlockFetcher } from './block.js'
  *   head: import('./clock').EventLink<EventData>[]
  *   event: import('./clock').EventBlockView<EventData>
  * } & import('./index').ShardDiff} Result
-1 */
+ */
 
 /**
  * Put a value (a CID) for the given key. If the key exists it's value is
@@ -101,6 +101,52 @@ export async function put (blocks, head, key, value, options) {
     head,
     event
   }
+}
+
+/**
+ * Determine the effective pail root given the current merkle clock head.
+ *
+ * @param {import('./block').BlockFetcher} blocks Bucket block storage.
+ * @param {import('./clock').EventLink<EventData>[]} head Merkle clock head.
+ */
+export async function root (blocks, head) {
+  if (!head.length) return
+
+  const mblocks = new MemoryBlockstore()
+  blocks = new MultiBlockFetcher(mblocks, blocks)
+
+  const events = new EventFetcher(blocks)
+  const ancestor = await findCommonAncestor(events, head)
+  if (!ancestor) throw new Error('failed to find common ancestor event')
+
+  const aevent = await events.get(ancestor)
+  let { root } = aevent.value.data
+
+  const sorted = await findSortedEvents(events, head, ancestor)
+  for (const { value: event } of sorted) {
+    if (!['put', 'del'].includes(event.data.type)) {
+      throw new Error(`unknown event type: ${event.data.type}`)
+    }
+    const result = event.data.type === 'put'
+      ? await Pail.put(blocks, root, event.data.key, event.data.value)
+      : await Pail.del(blocks, root, event.data.key)
+
+    root = result.root
+    for (const a of result.additions) {
+      mblocks.putSync(a.cid, a.bytes)
+    }
+  }
+
+  return root
+}
+
+/**
+ * @param {import('./block').BlockFetcher} blocks Bucket block storage.
+ * @param {import('./clock').EventLink<EventData>[]} head Merkle clock head.
+ * @param {string} key The key of the value to retrieve.
+ */
+export async function get (blocks, head, key) {
+  return Pail.get(blocks, await root(blocks, head), key)
 }
 
 /**
