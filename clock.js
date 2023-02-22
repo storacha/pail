@@ -155,7 +155,7 @@ async function contains (events, a, b) {
  * @param {(b: EventBlockView<T>) => string} [options.renderNodeLabel]
  */
 export async function * vis (blocks, head, options = {}) {
-  const renderNodeLabel = options.renderNodeLabel ?? (b => shortLink(b.cid))
+  const renderNodeLabel = options.renderNodeLabel ?? (b => (b.value.data.value))
   const events = new EventFetcher(blocks)
   yield 'digraph clock {'
   yield '  node [shape=point fontname="Courier"]; head;'
@@ -185,6 +185,3 @@ export async function * vis (blocks, head, options = {}) {
   }
   yield '}'
 }
-
-/** @param {import('./link').AnyLink} l */
-const shortLink = l => `${String(l).slice(0, 4)}..${String(l).slice(-4)}`
