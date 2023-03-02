@@ -3,7 +3,7 @@ import { CID } from 'multiformats/cid'
 import { openDB } from 'idb'
 import cargoQueue from 'async/cargoQueue.js'
 
-// const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 export default class Valet {
   #cars = new Map() // cars by cid
@@ -23,7 +23,9 @@ export default class Valet {
       console.log('queue worker', tasks.length, tasks.reduce((acc, t) => acc + t.value.length, 0))
       if (this.uploadFunction) {
         for (const task of tasks) {
-          await this.uploadFunction(task.carCid, task.value)
+          sleep(100)
+          console.log('could upload', task.carCid, task.value.length)
+          // await this.uploadFunction(task.carCid, task.value)
         }
       }
       callback()
