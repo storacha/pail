@@ -16,6 +16,9 @@ import InputArea from './components/InputArea'
 import TodoItem from './components/TodoItem'
 import { W3APIProvider } from './components/W3API'
 import { Authenticator } from './components/Authenticator'
+import { Store } from '@web3-storage/upload-client'
+import { store } from '@web3-storage/capabilities/store'
+
 
 export const FireproofCtx = createContext<Fireproof>(null)
 
@@ -117,7 +120,15 @@ function SpaceRegistrar(): JSX.Element {
 
 
 
-
+async function uploadCarBytes(agent, carBytes: Uint8Array) {
+  const conf = {
+    issuer: agent.issuer,
+    with: agent.currentSpace(),
+    proofs: await agent.proofs([store]),
+  }
+  const carCID = await Store.add(conf, carBytes)
+  console.log('carCID', carCID)
+}
 
 
 
@@ -130,10 +141,21 @@ function AllLists() {
     revalidator.revalidate();
   })
 
+  const [{ agent, space }] = useKeyring()
+  const registered = Boolean(space?.registered())
 
   const onSubmit = async (title: string) => {
     const { id } = await addList(title)
   }
+
+  
+  useEffect(() => {
+    console.log('all lists registered', registered)
+    if (registered) {
+      
+    }
+  }, [registered])
+
   return (
     <div>
       <div className='listNav'>
@@ -161,7 +183,7 @@ function AllLists() {
         placeholder='Create a new list or choose from above.'
       />
       <TimeTravel database={database} />
-
+      {!registered && <SpaceRegistrar />}
     </div>
   )
 }
@@ -218,8 +240,7 @@ function List() {
   const edit = (todo: TodoDoc) => () => setEditing(todo._id)
   const onClearCompleted = async () => await clearCompleted(list._id)
 
-  const [{ space }] = useKeyring()
-  const registered = Boolean(space?.registered())
+
 
 
   return (
@@ -263,7 +284,6 @@ function List() {
         uri={uri && uri.split('/').slice(0, 3).join('/')}
       />
       <TimeTravel database={database} />
-      {!registered && <SpaceRegistrar />}
     </div>
   )
 }
