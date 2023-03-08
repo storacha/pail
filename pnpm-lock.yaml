@@ -42,6 +42,7 @@ importers:
   examples/todomvc:
     specifiers:
       '@fireproof/core': workspace:^
+      '@fireproof/use-fireproof': workspace:*
       '@types/react': ^18.0.27
       '@types/react-dom': ^18.0.10
       '@vitejs/plugin-react': ^3.1.0
@@ -63,6 +64,7 @@ importers:
       vite: ^4.1.0
     dependencies:
       '@fireproof/core': link:../../packages/fireproof
+      '@fireproof/use-fireproof': link:../../packages/use-fireproof
       '@w3ui/react-keyring': 3.0.1_pmekkgnqduwlme35zpnqhenc34
       '@web3-storage/capabilities': 3.2.0
       '@web3-storage/upload-client': 6.0.0
@@ -120,6 +122,12 @@ importers:
       mocha: 10.2.0
       nanoid: 4.0.1
       standard: 17.0.0
+
+  packages/use-fireproof:
+    specifiers:
+      react: ^18.2.0
+    dependencies:
+      react: 18.2.0
 
 packages:
 

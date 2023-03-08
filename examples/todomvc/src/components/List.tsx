@@ -5,7 +5,7 @@ import { useNavigate, useParams, useLoaderData, useRevalidator } from 'react-rou
 import Footer from './Footer'
 import InputArea from './InputArea'
 import TodoItem from './TodoItem'
-import { FireproofCtx } from '../hooks/useFireproof'
+import { FireproofCtx } from '@fireproof/use-fireproof'
 import { TimeTravel } from './TimeTravel'
 import { UploadManager, UploaderCtx } from '../hooks/useUploader'
 

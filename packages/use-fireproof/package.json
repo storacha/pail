@@ -1,0 +1,15 @@
+{
+  "name": "@fireproof/use-fireproof",
+  "version": "0.1.0",
+  "description": "React hook to manage a Fireproof database",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "Apache-2.0 OR MIT",
+  "dependencies": {
+    "react": "^18.2.0"
+  }
+}
