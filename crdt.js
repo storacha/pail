@@ -169,8 +169,8 @@ export async function get (blocks, head, key) {
  * @param {object} [options]
  * @param {string} [options.prefix]
  */
-export async function entries (blocks, head, options) {
-  return Pail.entries(blocks, await root(blocks, head), options)
+export async function * entries (blocks, head, options) {
+  yield * Pail.entries(blocks, await root(blocks, head), options)
 }
 
 /**
