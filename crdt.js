@@ -164,6 +164,16 @@ export async function get (blocks, head, key) {
 }
 
 /**
+ * @param {import('./block').BlockFetcher} blocks Bucket block storage.
+ * @param {import('./clock').EventLink<EventData>[]} head Merkle clock head.
+ * @param {object} [options]
+ * @param {string} [options.prefix]
+ */
+export async function entries (blocks, head, options) {
+  return Pail.entries(blocks, await root(blocks, head), options)
+}
+
+/**
  * Find the common ancestor event of the passed children. A common ancestor is
  * the first single event in the DAG that _all_ paths from children lead to.
  *
