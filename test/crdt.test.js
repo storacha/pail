@@ -41,42 +41,56 @@ describe('CRDT', () => {
   it('simple parallel put multiple values', async () => {
     const blocks = new Blockstore()
     const alice = new TestPail(blocks, [])
-    await alice.put('key0', await randomCID(32))
+    await alice.put('apple', await randomCID(32))
     const bob = new TestPail(blocks, alice.head)
 
     /** @type {Array<[string, import('../link').AnyLink]>} */
     const data = [
-      ['key1', await randomCID(32)],
-      ['key2', await randomCID(32)],
-      ['key3', await randomCID(32)],
-      ['key4', await randomCID(32)]
+      ['banana', await randomCID(32)],
+      ['kiwi', await randomCID(32)],
+      ['mango', await randomCID(32)],
+      ['orange', await randomCID(32)],
+      ['pear', await randomCID(32)]
     ]
 
     const { event: aevent0 } = await alice.put(data[0][0], data[0][1])
     const { event: bevent0 } = await bob.put(data[1][0], data[1][1])
-    const { event: bevent1 } = await bob.put(data[2][0], data[2][1])
 
+    const carol = new TestPail(blocks, bob.head)
+
+    const { event: bevent1 } = await bob.put(data[2][0], data[2][1])
+    const { event: cevent1 } = await carol.put(data[3][0], data[3][1])
+
+    await alice.advance(cevent1.cid)
     await alice.advance(bevent0.cid)
     await alice.advance(bevent1.cid)
     await bob.advance(aevent0.cid)
 
-    const { event: aevent1 } = await alice.putAndVis(data[3][0], data[3][1])
+    const { event: aevent1 } = await alice.putAndVis(data[4][0], data[4][1])
 
     await bob.advance(aevent1.cid)
+    await carol.advance(aevent1.cid)
 
     assert(alice.root)
     assert(bob.root)
-    assert.equal(alice.root.toString(), bob.root.toString())
+    assert(carol.root)
+    assert.equal(bob.root.toString(), alice.root.toString())
+    assert.equal(carol.root.toString(), alice.root.toString())
 
-    // get item put to bob
+    // get item put to bob from alice
     const avalue = await alice.get(data[1][0])
     assert(avalue)
     assert.equal(avalue.toString(), data[1][1].toString())
 
-    // get item put to alice
+    // get item put to alice from bob
     const bvalue = await bob.get(data[0][0])
     assert(bvalue)
     assert.equal(bvalue.toString(), data[0][1].toString())
+
+    // get item put to alice from carol
+    const cvalue = await bob.get(data[4][0])
+    assert(cvalue)
+    assert.equal(cvalue.toString(), data[4][1].toString())
   })
 })
 

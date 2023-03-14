@@ -104,6 +104,20 @@ export async function put (blocks, head, key, value, options) {
 }
 
 /**
+ * Delete the value for the given key from the bucket. If the key is not found
+ * no operation occurs.
+ *
+ * @param {import('./block').BlockFetcher} blocks Bucket block storage.
+ * @param {import('./clock').EventLink<EventData>[]} head Merkle clock head.
+ * @param {string} key The key of the value to delete.
+ * @param {object} [options]
+ * @returns {Promise<Result>}
+ */
+export async function del (blocks, head, key, options) {
+  throw new Error('not implemented')
+}
+
+/**
  * Determine the effective pail root given the current merkle clock head.
  *
  * @param {import('./block').BlockFetcher} blocks Bucket block storage.
