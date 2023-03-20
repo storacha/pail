@@ -1,6 +1,6 @@
 import { describe, it } from 'mocha'
 import assert from 'node:assert'
-import { ShardBlock, put, entries } from '../index.js'
+import { ShardBlock, put, entries } from '../src/index.js'
 import { Blockstore, randomCID } from './helpers.js'
 
 describe('entries', () => {
@@ -9,7 +9,7 @@ describe('entries', () => {
     const blocks = new Blockstore()
     await blocks.put(empty.cid, empty.bytes)
 
-    /** @type {Array<[string, import('../link').AnyLink]>} */
+    /** @type {Array<[string, import('../src/link').AnyLink]>} */
     const testdata = [
       ['c', await randomCID(32)],
       ['d', await randomCID(32)],
@@ -17,7 +17,7 @@ describe('entries', () => {
       ['b', await randomCID(32)]
     ]
 
-    /** @type {import('../shard').ShardLink} */
+    /** @type {import('../src/shard').ShardLink} */
     let root = empty.cid
     for (const [k, v] of testdata) {
       const res = await put(blocks, root, k, v)
@@ -42,7 +42,7 @@ describe('entries', () => {
     const blocks = new Blockstore()
     await blocks.put(empty.cid, empty.bytes)
 
-    /** @type {Array<[string, import('../link').AnyLink]>} */
+    /** @type {Array<[string, import('../src/link').AnyLink]>} */
     const testdata = [
       ['cccc', await randomCID(32)],
       ['deee', await randomCID(32)],
@@ -50,7 +50,7 @@ describe('entries', () => {
       ['beee', await randomCID(32)]
     ]
 
-    /** @type {import('../shard').ShardLink} */
+    /** @type {import('../src/shard').ShardLink} */
     let root = empty.cid
     for (const [k, v] of testdata) {
       const res = await put(blocks, root, k, v)

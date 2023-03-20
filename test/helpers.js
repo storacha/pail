@@ -3,8 +3,8 @@ import assert from 'node:assert'
 import * as Link from 'multiformats/link'
 import * as raw from 'multiformats/codecs/raw'
 import { sha256 } from 'multiformats/hashes/sha2'
-import { decodeShardBlock } from '../index.js'
-import { MemoryBlockstore } from '../block.js'
+import { decodeShardBlock } from '../src/index.js'
+import { MemoryBlockstore } from '../src/block.js'
 
 /** @param {number} size */
 export async function randomCID (size) {
@@ -26,7 +26,7 @@ export async function randomBytes (size) {
 
 export class Blockstore extends MemoryBlockstore {
   /**
-   * @param {import('../shard').ShardLink} cid
+   * @param {import('../src/shard').ShardLink} cid
    * @param {string} [prefix]
    */
   async getShardBlock (cid, prefix) {

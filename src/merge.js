@@ -11,6 +11,7 @@ export async function merge (blocks, base, targets) {
   const diffs = await Promise.all(targets.map(t => difference(blocks, base, t)))
   const additions = new Map()
   const removals = new Map()
+  /** @type {import('./block').BlockFetcher} */
   const fetcher = { get: cid => additions.get(cid.toString()) ?? blocks.get(cid) }
 
   let root = base

@@ -1,7 +1,7 @@
 import { describe, it } from 'mocha'
 import assert from 'node:assert'
-import { ShardBlock, put } from '../index.js'
-import { difference } from '../diff.js'
+import { ShardBlock, put } from '../src/index.js'
+import { difference } from '../src/diff.js'
 import { Blockstore, randomCID } from './helpers.js'
 
 describe('diff', () => {
@@ -10,12 +10,12 @@ describe('diff', () => {
     const blocks = new Blockstore()
     await blocks.put(empty.cid, empty.bytes)
 
-    /** @type {Array<[string, import('../link').AnyLink]>} */
+    /** @type {Array<[string, import('../src/link').AnyLink]>} */
     const testdata = [
       ['a', await randomCID(32)]
     ]
 
-    /** @type {import('../shard').ShardLink} */
+    /** @type {import('../src/shard').ShardLink} */
     let root = empty.cid
     for (const [k, v] of testdata) {
       const res = await put(blocks, root, k, v)

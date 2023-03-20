@@ -22,7 +22,7 @@ async function main () {
   blocks.putSync(rootblk.cid, rootblk.bytes)
 
   console.time(`put x${words.length}`)
-  /** @type {import('../../shard').ShardLink} */
+  /** @type {import('../../src/shard').ShardLink} */
   let root = rootblk.cid
   for (const [i, word] of words.entries()) {
     const res = await put(blocks, root, word, cids[i])

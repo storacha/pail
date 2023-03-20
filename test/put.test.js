@@ -1,8 +1,8 @@
 import { describe, it } from 'mocha'
 import assert from 'node:assert'
 import { nanoid } from 'nanoid'
-import { ShardBlock, put, MaxKeyLength, get, encodeShardBlock } from '../index.js'
-import { putEntry } from '../shard.js'
+import { ShardBlock, put, MaxKeyLength, get, encodeShardBlock } from '../src/index.js'
+import { putEntry } from '../src/shard.js'
 import { Blockstore, randomCID } from './helpers.js'
 
 const maxShardSize = 1024 // tiny shard size for testing
@@ -11,9 +11,9 @@ const maxShardSize = 1024 // tiny shard size for testing
  * Fill a shard until it exceeds the size limit. Returns the entry that will
  * cause the limit to exceed.
  *
- * @param {import('../shard').Shard} shard
+ * @param {import('../src/shard').Shard} shard
  * @param {number} size
- * @param {(i: number) => Promise<import('../shard').ShardValueEntry>} [mkentry]
+ * @param {(i: number) => Promise<import('../src/shard').ShardValueEntry>} [mkentry]
  */
 async function fillShard (shard, size, mkentry) {
   mkentry = mkentry ?? (async () => [nanoid(), await randomCID(32)])

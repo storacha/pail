@@ -2,12 +2,75 @@
   "name": "@alanshaw/pail",
   "version": "0.2.1",
   "description": "DAG based key value store.",
-  "main": "index.js",
+  "main": "src/index.js",
   "type": "module",
+  "types": "./dist/src/index.d.ts",
+  "typesVersions": {
+    "*": {
+      "*": [
+        "dist/*"
+      ],
+      "dist/src/index.d.ts": [
+        "dist/src/index.d.ts"
+      ],
+      "block": [
+        "dist/src/block.d.ts"
+      ],
+      "clock": [
+        "dist/src/clock.d.ts"
+      ],
+      "crdt": [
+        "dist/src/crdt.d.ts"
+      ],
+      "diff": [
+        "dist/src/diff.d.ts"
+      ],
+      "link": [
+        "dist/src/link.d.ts"
+      ],
+      "merge": [
+        "dist/src/merge.d.ts"
+      ],
+      "shard": [
+        "dist/src/shard.d.ts"
+      ]
+    }
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "import": "./src/index.js"
+    },
+    "./block": {
+      "types": "./dist/src/block.d.ts",
+      "import": "./src/block.js"
+    },
+    "./clock": {
+      "types": "./dist/src/clock.d.ts",
+      "import": "./src/clock.js"
+    },
+    "./diff": {
+      "types": "./dist/src/diff.d.ts",
+      "import": "./src/diff.js"
+    },
+    "./link": {
+      "types": "./dist/src/link.d.ts",
+      "import": "./src/link.js"
+    },
+    "./merge": {
+      "types": "./dist/src/merge.d.ts",
+      "import": "./src/merge.js"
+    },
+    "./shard": {
+      "types": "./dist/src/shard.d.ts",
+      "import": "./src/shard.js"
+    }
+  },
   "bin": {
     "pail": "./cli.js"
   },
   "scripts": {
+    "build": "tsc --build",
     "test": "mocha test/*.test.js",
     "coverage": "c8 -r html -r text npm test",
     "lint": "standard"
@@ -22,6 +85,10 @@
   ],
   "author": "Alan Shaw",
   "license": "Apache-2.0 OR MIT",
+  "files": [
+    "src",
+    "dist"
+  ],
   "dependencies": {
     "@ipld/car": "^5.0.1",
     "@ipld/dag-cbor": "^9.0.0",
@@ -34,7 +101,8 @@
     "c8": "^7.12.0",
     "mocha": "^10.2.0",
     "nanoid": "^4.0.0",
-    "standard": "^17.0.0"
+    "standard": "^17.0.0",
+    "typescript": "^5.0.2"
   },
   "repository": {
     "type": "git",
@@ -43,5 +111,10 @@
   "bugs": {
     "url": "https://github.com/alanshaw/pail/issues"
   },
-  "homepage": "https://github.com/alanshaw/pail#readme"
+  "homepage": "https://github.com/alanshaw/pail#readme",
+  "standard": {
+    "ignore": [
+      "*.ts"
+    ]
+  }
 }

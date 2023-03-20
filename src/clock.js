@@ -55,6 +55,7 @@ export async function advance (blocks, head, event) {
 
 /**
  * @template T
+ * @extends {Block<EventView<T>, typeof cbor.code, typeof sha256.code, 1>}
  * @implements {EventBlockView<T>}
  */
 export class EventBlock extends Block {
@@ -126,7 +127,7 @@ export async function decodeEventBlock (bytes) {
 /**
  * Returns true if event "a" contains event "b". Breadth first search.
  * @template T
- * @param {EventFetcher} events
+ * @param {EventFetcher<T>} events
  * @param {EventLink<T>} a
  * @param {EventLink<T>} b
  */
@@ -160,6 +161,7 @@ export async function * vis (blocks, head, options = {}) {
   yield 'digraph clock {'
   yield '  node [shape=point fontname="Courier"]; head;'
   const hevents = await Promise.all(head.map(link => events.get(link)))
+  /** @type {import('multiformats').Link<EventView<any>>[]} */
   const links = []
   const nodes = new Set()
   for (const e of hevents) {

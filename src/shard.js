@@ -14,7 +14,10 @@ import * as cbor from '@ipld/dag-cbor'
  * @typedef {import('multiformats').BlockView<Shard, typeof cbor.code, typeof sha256.code, 1> & { prefix: string }} ShardBlockView
  */
 
-/** @implements {ShardBlockView} */
+/**
+ * @extends {Block<Shard, typeof cbor.code, typeof sha256.code, 1>}
+ * @implements {ShardBlockView}
+ */
 export class ShardBlock extends Block {
   /**
    * @param {object} config
@@ -136,6 +139,7 @@ export function findCommonPrefix (shard, skey) {
   const startidx = shard.findIndex(([k]) => skey === k)
   if (startidx === -1) throw new Error(`key not found in shard: ${skey}`)
   let i = startidx
+  /** @type {string} */
   let pfx
   while (true) {
     pfx = shard[i][0].slice(0, -1)

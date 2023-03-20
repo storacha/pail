@@ -1,6 +1,6 @@
 import { describe, it } from 'mocha'
 import assert from 'node:assert'
-import { ShardBlock, put, get, del } from '../index.js'
+import { ShardBlock, put, get, del } from '../src/index.js'
 import { Blockstore, randomCID } from './helpers.js'
 
 describe('del', () => {

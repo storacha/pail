@@ -219,34 +219,37 @@ export async function * entries (blocks, root, options = {}) {
   const shards = new ShardFetcher(blocks)
   const rshard = await shards.get(root)
 
-  yield * (async function * ents (shard) {
-    for (const entry of shard.value) {
-      const key = shard.prefix + entry[0]
+  yield * (
+    /** @returns {AsyncIterableIterator<import('./shard').ShardEntry>} */
+    async function * ents (shard) {
+      for (const entry of shard.value) {
+        const key = shard.prefix + entry[0]
 
-      if (Array.isArray(entry[1])) {
-        if (entry[1][1]) {
-          if (!prefix || (prefix && key.startsWith(prefix))) {
-            yield [key, entry[1][1]]
+        if (Array.isArray(entry[1])) {
+          if (entry[1][1]) {
+            if (!prefix || (prefix && key.startsWith(prefix))) {
+              yield [key, entry[1][1]]
+            }
           }
-        }
 
-        if (prefix) {
-          if (prefix.length <= key.length && !key.startsWith(prefix)) {
+          if (prefix) {
+            if (prefix.length <= key.length && !key.startsWith(prefix)) {
+              continue
+            }
+            if (prefix.length > key.length && !prefix.startsWith(key)) {
+              continue
+            }
+          }
+          yield * ents(await shards.get(entry[1][0], key))
+        } else {
+          if (prefix && !key.startsWith(prefix)) {
             continue
           }
-          if (prefix.length > key.length && !prefix.startsWith(key)) {
-            continue
-          }
+          yield [key, entry[1]]
         }
-        yield * ents(await shards.get(entry[1][0], key))
-      } else {
-        if (prefix && !key.startsWith(prefix)) {
-          continue
-        }
-        yield [key, entry[1]]
       }
     }
-  })(rshard)
+  )(rshard)
 }
 
 /**

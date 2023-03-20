@@ -177,7 +177,7 @@ export async function * entries (blocks, head, options) {
  * Find the common ancestor event of the passed children. A common ancestor is
  * the first single event in the DAG that _all_ paths from children lead to.
  *
- * @param {import('./clock').EventFetcher} events
+ * @param {import('./clock').EventFetcher<EventData>} events
  * @param  {import('./clock').EventLink<EventData>[]} children
  */
 async function findCommonAncestor (events, children) {
@@ -198,7 +198,7 @@ async function findCommonAncestor (events, children) {
 }
 
 /**
- * @param {import('./clock').EventFetcher} events
+ * @param {import('./clock').EventFetcher<EventData>} events
  * @param {import('./clock').EventLink<EventData>} root
  */
 async function findAncestorCandidate (events, root) {
@@ -230,7 +230,7 @@ function findCommonString (arrays) {
 
 /**
  * Find and sort events between the head(s) and the tail.
- * @param {import('./clock').EventFetcher} events
+ * @param {import('./clock').EventFetcher<EventData>} events
  * @param {import('./clock').EventLink<EventData>[]} head
  * @param {import('./clock').EventLink<EventData>} tail
  */
@@ -269,7 +269,7 @@ async function findSortedEvents (events, head, tail) {
 }
 
 /**
- * @param {import('./clock').EventFetcher} events
+ * @param {import('./clock').EventFetcher<EventData>} events
  * @param {import('./clock').EventLink<EventData>} start
  * @param {import('./clock').EventLink<EventData>} end
  * @returns {Promise<Array<{ event: import('./clock').EventBlockView<EventData>, depth: number }>>}
