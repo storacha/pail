@@ -129,6 +129,7 @@ export async function root (blocks, head) {
   const mblocks = new MemoryBlockstore()
   blocks = new MultiBlockFetcher(mblocks, blocks)
 
+  /** @type {EventFetcher<EventData>} */
   const events = new EventFetcher(blocks)
   const ancestor = await findCommonAncestor(events, head)
   if (!ancestor) throw new Error('failed to find common ancestor event')
@@ -160,7 +161,9 @@ export async function root (blocks, head) {
  * @param {string} key The key of the value to retrieve.
  */
 export async function get (blocks, head, key) {
-  return Pail.get(blocks, await root(blocks, head), key)
+  const cid = await root(blocks, head)
+  if (!cid) return
+  return Pail.get(blocks, cid, key)
 }
 
 /**
@@ -170,7 +173,9 @@ export async function get (blocks, head, key) {
  * @param {string} [options.prefix]
  */
 export async function * entries (blocks, head, options) {
-  yield * Pail.entries(blocks, await root(blocks, head), options)
+  const cid = await root(blocks, head)
+  if (!cid) return
+  yield * Pail.entries(blocks, cid, options)
 }
 
 /**
