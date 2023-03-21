@@ -49,6 +49,10 @@
       "types": "./dist/src/clock.d.ts",
       "import": "./src/clock.js"
     },
+    "./crdt": {
+      "types": "./dist/src/crdt.d.ts",
+      "import": "./src/crdt.js"
+    },
     "./diff": {
       "types": "./dist/src/diff.d.ts",
       "import": "./src/diff.js"
