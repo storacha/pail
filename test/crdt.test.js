@@ -1,7 +1,7 @@
 import { describe, it } from 'mocha'
 import assert from 'node:assert'
 import { advance, vis } from '../src/clock.js'
-import { put, get, root } from '../src/crdt.js'
+import { put, get, root, entries } from '../src/crdt.js'
 import { Blockstore, randomCID } from './helpers.js'
 
 describe('CRDT', () => {
@@ -92,6 +92,50 @@ describe('CRDT', () => {
     assert(cvalue)
     assert.equal(cvalue.toString(), data[4][1].toString())
   })
+
+  it('get from multi event head', async () => {
+    const blocks = new Blockstore()
+    const alice = new TestPail(blocks, [])
+    await alice.put('apple', await randomCID(32))
+    const bob = new TestPail(blocks, alice.head)
+
+    /** @type {Array<[string, import('../src/link').AnyLink]>} */
+    const data = [
+      ['banana', await randomCID(32)],
+      ['kiwi', await randomCID(32)]
+    ]
+
+    await alice.put(data[0][0], data[0][1])
+    const { event } = await bob.put(data[1][0], data[1][1])
+
+    await alice.advance(event.cid)
+    const value = await alice.get(data[1][0])
+
+    assert(value)
+    assert.equal(value.toString(), data[1][1].toString())
+  })
+
+  it('entries from multi event head', async () => {
+    const blocks = new Blockstore()
+    const alice = new TestPail(blocks, [])
+    await alice.put('apple', await randomCID(32))
+    const bob = new TestPail(blocks, alice.head)
+
+    /** @type {Array<[string, import('../src/link').AnyLink]>} */
+    const data = [
+      ['banana', await randomCID(32)],
+      ['kiwi', await randomCID(32)]
+    ]
+
+    await alice.put(data[0][0], data[0][1])
+    const { event } = await bob.put(data[1][0], data[1][1])
+
+    await alice.advance(event.cid)
+
+    for await (const [k, v] of alice.entries()) {
+      assert(v.toString(), new Map(data).get(k)?.toString())
+    }
+  })
 })
 
 class TestPail {
@@ -109,7 +153,9 @@ class TestPail {
   /** @param {import('../src/clock').EventLink<import('../src/crdt').EventData>} event */
   async advance (event) {
     this.head = await advance(this.blocks, this.head, event)
-    this.root = await root(this.blocks, this.head)
+    const result = await root(this.blocks, this.head)
+    result.additions.forEach(a => this.blocks.putSync(a.cid, a.bytes))
+    this.root = result.root
     return this.head
   }
 
@@ -122,7 +168,7 @@ class TestPail {
     this.blocks.putSync(result.event.cid, result.event.bytes)
     result.additions.forEach(a => this.blocks.putSync(a.cid, a.bytes))
     this.head = result.head
-    this.root = await root(this.blocks, this.head)
+    this.root = (await root(this.blocks, this.head)).root
     return result
   }
 
@@ -149,5 +195,13 @@ class TestPail {
   /** @param {string} key */
   async get (key) {
     return get(this.blocks, this.head, key)
+  }
+
+  /**
+   * @param {object} [options]
+   * @param {string} [options.prefix]
+   */
+  async * entries (options) {
+    yield * entries(this.blocks, this.head, options)
   }
 }

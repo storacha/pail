@@ -58,7 +58,9 @@ export async function put (blocks, head, key, value, options) {
   let { root } = aevent.value.data
 
   const sorted = await findSortedEvents(events, head, ancestor)
+  /** @type {Map<string, import('./shard').ShardBlockView>} */
   const additions = new Map()
+  /** @type {Map<string, import('./shard').ShardBlockView>} */
   const removals = new Map()
 
   for (const { value: event } of sorted) {
@@ -94,10 +96,18 @@ export async function put (blocks, head, key, value, options) {
   mblocks.putSync(event.cid, event.bytes)
   head = await Clock.advance(blocks, head, event.cid)
 
+  // filter blocks that were added _and_ removed
+  for (const k of removals.keys()) {
+    if (additions.has(k)) {
+      additions.delete(k)
+      removals.delete(k)
+    }
+  }
+
   return {
     root: result.root,
-    additions: Array.from(additions.values()),
-    removals: Array.from(removals.values()),
+    additions: [...additions.values()],
+    removals: [...removals.values()],
     head,
     event
   }
@@ -120,17 +130,28 @@ export async function del (blocks, head, key, options) {
 /**
  * Determine the effective pail root given the current merkle clock head.
  *
+ * Clocks with multiple head events may return blocks that were added or
+ * removed while playing forward events from their common ancestor.
+ *
  * @param {import('./block').BlockFetcher} blocks Bucket block storage.
  * @param {import('./clock').EventLink<EventData>[]} head Merkle clock head.
+ * @returns {Promise<{ root: import('./shard').ShardLink } & import('./index').ShardDiff>}
  */
 export async function root (blocks, head) {
-  if (!head.length) return
+  if (!head.length) throw new Error('cannot determine root of headless clock')
 
   const mblocks = new MemoryBlockstore()
   blocks = new MultiBlockFetcher(mblocks, blocks)
 
   /** @type {EventFetcher<EventData>} */
   const events = new EventFetcher(blocks)
+
+  if (head.length === 1) {
+    const event = await events.get(head[0])
+    const { root } = event.value.data
+    return { root, additions: [], removals: [] }
+  }
+
   const ancestor = await findCommonAncestor(events, head)
   if (!ancestor) throw new Error('failed to find common ancestor event')
 
@@ -138,6 +159,11 @@ export async function root (blocks, head) {
   let { root } = aevent.value.data
 
   const sorted = await findSortedEvents(events, head, ancestor)
+  /** @type {Map<string, import('./shard').ShardBlockView>} */
+  const additions = new Map()
+  /** @type {Map<string, import('./shard').ShardBlockView>} */
+  const removals = new Map()
+
   for (const { value: event } of sorted) {
     if (!['put', 'del'].includes(event.data.type)) {
       throw new Error(`unknown event type: ${event.data.type}`)
@@ -149,10 +175,26 @@ export async function root (blocks, head) {
     root = result.root
     for (const a of result.additions) {
       mblocks.putSync(a.cid, a.bytes)
+      additions.set(a.cid.toString(), a)
+    }
+    for (const r of result.removals) {
+      removals.set(r.cid.toString(), r)
     }
   }
 
-  return root
+  // filter blocks that were added _and_ removed
+  for (const k of removals.keys()) {
+    if (additions.has(k)) {
+      additions.delete(k)
+      removals.delete(k)
+    }
+  }
+
+  return {
+    root,
+    additions: [...additions.values()],
+    removals: [...removals.values()]
+  }
 }
 
 /**
@@ -161,9 +203,12 @@ export async function root (blocks, head) {
  * @param {string} key The key of the value to retrieve.
  */
 export async function get (blocks, head, key) {
-  const cid = await root(blocks, head)
-  if (!cid) return
-  return Pail.get(blocks, cid, key)
+  if (!head.length) return
+  const result = await root(blocks, head)
+  if (result.additions.length) {
+    blocks = new MultiBlockFetcher(new MemoryBlockstore(result.additions), blocks)
+  }
+  return Pail.get(blocks, result.root, key)
 }
 
 /**
@@ -173,9 +218,12 @@ export async function get (blocks, head, key) {
  * @param {string} [options.prefix]
  */
 export async function * entries (blocks, head, options) {
-  const cid = await root(blocks, head)
-  if (!cid) return
-  yield * Pail.entries(blocks, cid, options)
+  if (!head.length) return
+  const result = await root(blocks, head)
+  if (result.additions.length) {
+    blocks = new MultiBlockFetcher(new MemoryBlockstore(result.additions), blocks)
+  }
+  yield * Pail.entries(blocks, result.root, options)
 }
 
 /**

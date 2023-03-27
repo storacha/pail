@@ -11,6 +11,15 @@ export class MemoryBlockstore {
   #blocks = new Map()
 
   /**
+   * @param {Array<AnyBlock>} [blocks]
+   */
+  constructor (blocks) {
+    if (blocks) {
+      this.#blocks = new Map(blocks.map(b => [b.cid.toString(), b.bytes]))
+    }
+  }
+
+  /**
    * @param {import('./link').AnyLink} cid
    * @returns {Promise<AnyBlock | undefined>}
    */

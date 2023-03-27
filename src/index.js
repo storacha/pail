@@ -212,7 +212,7 @@ export async function del (blocks, root, key) {
  * @param {import('./shard').ShardLink} root CID of the root node of the bucket.
  * @param {object} [options]
  * @param {string} [options.prefix]
- * @returns {AsyncIterableIterator<import('./shard').ShardEntry>}
+ * @returns {AsyncIterableIterator<import('./shard').ShardValueEntry>}
  */
 export async function * entries (blocks, root, options = {}) {
   const { prefix } = options
@@ -220,7 +220,7 @@ export async function * entries (blocks, root, options = {}) {
   const rshard = await shards.get(root)
 
   yield * (
-    /** @returns {AsyncIterableIterator<import('./shard').ShardEntry>} */
+    /** @returns {AsyncIterableIterator<import('./shard').ShardValueEntry>} */
     async function * ents (shard) {
       for (const entry of shard.value) {
         const key = shard.prefix + entry[0]
