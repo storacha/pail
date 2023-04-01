@@ -37,7 +37,7 @@ const compare = (a, b) => {
 const refCompare = (aRef, bRef) => {
   if (Number.isNaN(aRef)) return -1
   if (Number.isNaN(bRef)) throw new Error('ref may not be Infinity or NaN')
-  if (!Number.isFinite(aRef)) return 1 // need to test this on equal docids!
+  if (aRef === Infinity) return 1 // need to test this on equal docids!
   // if (!Number.isFinite(bRef)) throw new Error('ref may not be Infinity or NaN')
   return simpleCompare(aRef, bRef)
 }
