@@ -113,7 +113,7 @@ describe('DbIndex query', () => {
     await index.query({ range: [51, 54] })
 
     console.x('--- make Xander 53')
-    const DOCID = 'xxxx-3c3a-4b5e-9c1c-8c5c0c5c0c5c'
+    const DOCID = 'xander-doc'
     const r1 = await database.put({ _id: DOCID, name: 'Xander', age: 53 })
     assert(r1.id, 'should have id')
 

@@ -9,7 +9,7 @@ import * as codec from '@ipld/dag-cbor'
 import { doTransaction } from './blockstore.js'
 import charwise from 'charwise'
 
-const ALWAYS_REBUILD = true // todo: remove this
+const ALWAYS_REBUILD = false // todo: make false
 
 // const arrayCompare = (a, b) => {
 //   if (Array.isArray(a) && Array.isArray(b)) {
@@ -42,7 +42,8 @@ const refCompare = (aRef, bRef) => {
   return simpleCompare(aRef, bRef)
 }
 
-const opts = { cache, chunker: bf(3), codec, hasher, compare }
+const dbIndexOpts = { cache, chunker: bf(3), codec, hasher, compare }
+const idIndexOpts = { cache, chunker: bf(3), codec, hasher, compare: simpleCompare }
 
 const makeDoc = ({ key, value }) => ({ _id: key, ...value })
 
@@ -87,14 +88,6 @@ const indexEntriesForChanges = (changes, mapFun) => {
   return indexEntries
 }
 
-const indexEntriesForOldChanges = async (blocks, byIDindexRoot, ids, mapFun) => {
-  const { getBlock } = makeGetBlock(blocks)
-  const byIDindex = await load({ cid: byIDindexRoot.cid, get: getBlock, ...opts })
-
-  const result = await byIDindex.getMany(ids)
-  return result
-}
-
 /**
  * Represents an DbIndex for a Fireproof database.
  *
@@ -121,7 +114,7 @@ export default class DbIndex {
     this.dbIndexRoot = null
     this.dbIndex = null
 
-    this.byIDindexRoot = null
+    this.indexByIdRoot = null
     this.dbHead = null
 
     this.instanceId = this.database.instanceId + `.DbIndex.${Math.random().toString(36).substring(2, 7)}`
@@ -175,7 +168,7 @@ export default class DbIndex {
 
   async #innerUpdateIndex (inBlocks) {
     const callTag = Math.random().toString(36).substring(4)
-    console.log(`#updateIndex ${callTag} >`, this.instanceId, this.dbHead?.toString(), this.dbIndexRoot?.cid.toString(), this.byIDindexRoot?.cid.toString())
+    console.log(`#updateIndex ${callTag} >`, this.instanceId, this.dbHead?.toString(), this.dbIndexRoot?.cid.toString(), this.indexByIdRoot?.cid.toString())
     // todo remove this hack
     if (ALWAYS_REBUILD) {
       this.dbHead = null // hack
@@ -189,44 +182,42 @@ export default class DbIndex {
       return
     }
     await doTransaction('#updateIndex', inBlocks, async (blocks) => {
-      if (this.dbHead) {
-        const oldChangeEntries = await indexEntriesForOldChanges(
-          blocks,
-          this.byIDindexRoot,
-          result.rows.map(({ key }) => key),
-          this.mapFun
-        )
+      if (this.dbHead) { // need a maybe load
+        const oldChangeEntries = await this.indexById.getMany(result.rows.map(({ key }) => key))
+
+        console.log('oldChangeEntries', oldChangeEntries.result)
         const oldIndexEntries = oldChangeEntries.result.map((key) => ({ key, del: true }))
-        const removalResult = await bulkIndex(blocks, this.dbIndexRoot, this.dbIndex, oldIndexEntries, opts)
+        console.log('oldIndexEntries', oldIndexEntries)
+        const removalResult = await bulkIndex(blocks, this.dbIndexRoot, this.dbIndex, oldIndexEntries, dbIndexOpts)
         this.dbIndexRoot = removalResult.root
         this.dbIndex = removalResult.dbIndex
-
-        const removeByIdIndexEntries = oldIndexEntries.map(({ key }) => ({ key: key[1], del: true }))
-        const purgedRemovalResults = await bulkIndex(
-          blocks,
-          this.byIDindexRoot,
-          this.byIDIndex,
-          removeByIdIndexEntries,
-          opts
-        )
-        this.byIDindexRoot = purgedRemovalResults.root
-        this.byIDIndex = purgedRemovalResults.dbIndex
+        // const removeByIdIndexEntries = oldIndexEntries.map(({ key }) => ({ key: key[1], del: true }))
+        // const purgedRemovalResults = await bulkIndex(
+        //   blocks,
+        //   this.indexByIdRoot,
+        //   this.indexById,
+        //   removeByIdIndexEntries,
+        //   opts
+        // )
+        // this.indexByIdRoot = purgedRemovalResults.root
+        // this.indexById = purgedRemovalResults.dbIndex
       }
       const indexEntries = indexEntriesForChanges(result.rows, this.mapFun)
-      // console.log('indexEntries', indexEntries)
 
       const byIdIndexEntries = indexEntries.map(({ key }) => ({ key: key[1], value: key }))
-      const addFutureRemovalsResult = await bulkIndex(blocks, this.byIDindexRoot, this.byIDIndex, byIdIndexEntries, opts)
-      this.byIDindexRoot = addFutureRemovalsResult.root
-      this.byIDIndex = addFutureRemovalsResult.dbIndex
+      console.log('byIdIndexEntries', this.indexById?.constructor.name, byIdIndexEntries)
 
-      const updateIndexResult = await bulkIndex(blocks, this.dbIndexRoot, this.dbIndex, indexEntries, opts)
+      const addFutureRemovalsResult = await bulkIndex(blocks, this.indexByIdRoot, this.indexById, byIdIndexEntries, idIndexOpts)
+      this.indexByIdRoot = addFutureRemovalsResult.root
+      this.indexById = addFutureRemovalsResult.dbIndex
+
+      const updateIndexResult = await bulkIndex(blocks, this.dbIndexRoot, this.dbIndex, indexEntries, dbIndexOpts)
 
       this.dbIndexRoot = updateIndexResult.root
       this.dbIndex = updateIndexResult.dbIndex
       this.dbHead = result.clock
     })
-    console.log(`#updateIndex ${callTag} <`, this.instanceId, callTag, this.dbHead?.toString(), this.dbIndexRoot?.cid.toString(), this.byIDindexRoot?.cid.toString())
+    console.log(`#updateIndex ${callTag} <`, this.instanceId, this.dbHead?.toString(), this.dbIndexRoot?.cid.toString(), this.indexByIdRoot?.cid.toString())
   }
 }
 
@@ -237,13 +228,14 @@ export default class DbIndex {
  * @param {DbIndexEntry[]} indexEntries
  * @private
  */
-async function bulkIndex (blocks, inRoot, inDBindex, indexEntries) {
+async function bulkIndex (blocks, inRoot, inDBindex, indexEntries, opts) {
   if (!indexEntries.length) return { dbIndex: inDBindex, root: inRoot }
   const putBlock = blocks.put.bind(blocks)
   const { getBlock } = makeGetBlock(blocks)
   let returnRootBlock
   let returnNode
   if (!inDBindex) {
+    // maybe load from root?
     for await (const node of await create({ get: getBlock, list: indexEntries, ...opts })) {
       const block = await node.block
       await putBlock(block.cid, block.bytes)
@@ -252,8 +244,9 @@ async function bulkIndex (blocks, inRoot, inDBindex, indexEntries) {
     }
   } else {
     // const dbIndex = await load({ cid: inRoot.cid, get: getBlock, ...opts }) // todo load from root on refresh
+    // if (!inDBindex) throw new Error('no dbIndex')
     const { root, blocks } = await inDBindex.bulk(indexEntries)
-    returnRootBlock = await root.block
+    returnRootBlock = await root.block // remove superstition?
     returnNode = root
     for await (const block of blocks) {
       await putBlock(block.cid, block.bytes)
@@ -268,7 +261,7 @@ async function doIndexQuery (blocks, dbIndexRoot, dbIndex, query) {
     const cid = dbIndexRoot && dbIndexRoot.cid
     if (!cid) return { result: [] }
     const { getBlock } = makeGetBlock(blocks)
-    dbIndex = await load({ cid, get: getBlock, ...opts })
+    dbIndex = await load({ cid, get: getBlock, ...dbIndexOpts })
   }
   if (query.range) {
     const encodedRange = query.range.map((key) => charwise.encode(key))
