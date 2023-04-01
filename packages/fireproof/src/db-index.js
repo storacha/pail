@@ -146,9 +146,8 @@ export default class DbIndex {
   async query (query) {
     // if (!root) {
     // pass a root to query a snapshot
-    await doTransaction('#updateIndex', this.database.blocks, async (blocks) => {
-      await this.#updateIndex(blocks)
-    })
+    await this.#updateIndex(this.database.blocks)
+
     // }
     const response = await doIndexQuery(this.database.blocks, this.dbIndexRoot, this.dbIndex, query)
     return {
@@ -174,7 +173,7 @@ export default class DbIndex {
     return this.updateIndexPromise
   }
 
-  async #innerUpdateIndex (blocks) {
+  async #innerUpdateIndex (inBlocks) {
     const callTag = Math.random().toString(36).substring(4)
     console.log(`#updateIndex ${callTag} >`, this.instanceId, this.dbHead?.toString(), this.dbIndexRoot?.cid.toString(), this.byIDindexRoot?.cid.toString())
     // todo remove this hack
@@ -184,41 +183,49 @@ export default class DbIndex {
       this.dbIndexRoot = null
     }
     const result = await this.database.changesSince(this.dbHead) // {key, value, del}
-    if (this.dbHead) {
-      const oldChangeEntries = await indexEntriesForOldChanges(
-        blocks,
-        this.byIDindexRoot,
-        result.rows.map(({ key }) => key),
-        this.mapFun
-      )
-      const oldIndexEntries = oldChangeEntries.result.map((key) => ({ key, del: true }))
-      const removalResult = await bulkIndex(blocks, this.dbIndexRoot, this.dbIndex, oldIndexEntries, opts)
-      this.dbIndexRoot = removalResult.root
-      this.dbIndex = removalResult.dbIndex
-
-      const removeByIdIndexEntries = oldIndexEntries.map(({ key }) => ({ key: key[1], del: true }))
-      const purgedRemovalResults = await bulkIndex(
-        blocks,
-        this.byIDindexRoot,
-        this.byIDIndex,
-        removeByIdIndexEntries,
-        opts
-      )
-      this.byIDindexRoot = purgedRemovalResults.root
-      this.byIDIndex = purgedRemovalResults.dbIndex
+    if (result.rows.length === 0) {
+      console.log(`#updateIndex ${callTag} < no changes`)
+      this.dbHead = result.clock
+      return
     }
-    const indexEntries = indexEntriesForChanges(result.rows, this.mapFun)
-    // console.log('indexEntries', indexEntries)
+    await doTransaction('#updateIndex', inBlocks, async (blocks) => {
+      if (this.dbHead) {
+        const oldChangeEntries = await indexEntriesForOldChanges(
+          blocks,
+          this.byIDindexRoot,
+          result.rows.map(({ key }) => key),
+          this.mapFun
+        )
+        const oldIndexEntries = oldChangeEntries.result.map((key) => ({ key, del: true }))
+        const removalResult = await bulkIndex(blocks, this.dbIndexRoot, this.dbIndex, oldIndexEntries, opts)
+        this.dbIndexRoot = removalResult.root
+        this.dbIndex = removalResult.dbIndex
 
-    const byIdIndexEntries = indexEntries.map(({ key }) => ({ key: key[1], value: key }))
-    const addFutureRemovalsResult = await bulkIndex(blocks, this.byIDindexRoot, this.byIDIndex, byIdIndexEntries, opts)
-    this.byIDindexRoot = addFutureRemovalsResult.root
-    this.byIDIndex = addFutureRemovalsResult.dbIndex
+        const removeByIdIndexEntries = oldIndexEntries.map(({ key }) => ({ key: key[1], del: true }))
+        const purgedRemovalResults = await bulkIndex(
+          blocks,
+          this.byIDindexRoot,
+          this.byIDIndex,
+          removeByIdIndexEntries,
+          opts
+        )
+        this.byIDindexRoot = purgedRemovalResults.root
+        this.byIDIndex = purgedRemovalResults.dbIndex
+      }
+      const indexEntries = indexEntriesForChanges(result.rows, this.mapFun)
+      // console.log('indexEntries', indexEntries)
 
-    const updateIndexResult = await bulkIndex(blocks, this.dbIndexRoot, this.dbIndex, indexEntries, opts)
-    this.dbIndexRoot = updateIndexResult.root
-    this.dbIndex = updateIndexResult.dbIndex
-    this.dbHead = result.clock
+      const byIdIndexEntries = indexEntries.map(({ key }) => ({ key: key[1], value: key }))
+      const addFutureRemovalsResult = await bulkIndex(blocks, this.byIDindexRoot, this.byIDIndex, byIdIndexEntries, opts)
+      this.byIDindexRoot = addFutureRemovalsResult.root
+      this.byIDIndex = addFutureRemovalsResult.dbIndex
+
+      const updateIndexResult = await bulkIndex(blocks, this.dbIndexRoot, this.dbIndex, indexEntries, opts)
+
+      this.dbIndexRoot = updateIndexResult.root
+      this.dbIndex = updateIndexResult.dbIndex
+      this.dbHead = result.clock
+    })
     console.log(`#updateIndex ${callTag} <`, this.instanceId, callTag, this.dbHead?.toString(), this.dbIndexRoot?.cid.toString(), this.byIDindexRoot?.cid.toString())
   }
 }
