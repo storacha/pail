@@ -37,7 +37,7 @@ const compare = (a, b) => {
 const refCompare = (aRef, bRef) => {
   if (Number.isNaN(aRef)) return -1
   if (Number.isNaN(bRef)) throw new Error('ref may not be Infinity or NaN')
-  if (!Number.isFinite(aRef)) return 1
+  if (!Number.isFinite(aRef)) return 1 // need to test this on equal docids!
   // if (!Number.isFinite(bRef)) throw new Error('ref may not be Infinity or NaN')
   return simpleCompare(aRef, bRef)
 }
@@ -185,7 +185,6 @@ export default class DbIndex {
       if (this.dbHead) { // need a maybe load
         const oldChangeEntries = await this.indexById.getMany(result.rows.map(({ key }) => key))
 
-        console.log('oldChangeEntries', oldChangeEntries.result)
         const oldIndexEntries = oldChangeEntries.result.map((key) => ({ key, del: true }))
         console.log('oldIndexEntries', oldIndexEntries)
         const removalResult = await bulkIndex(blocks, this.dbIndexRoot, this.dbIndex, oldIndexEntries, dbIndexOpts)
