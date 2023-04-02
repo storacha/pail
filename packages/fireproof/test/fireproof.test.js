@@ -335,7 +335,7 @@ describe('Fireproof', () => {
     assert.equal(res9.rows.length, 0)
   })
 
-  it.skip('docs since repeated changes', async () => {
+  it('docs since repeated changes', async () => {
     assert.equal((await database.changesSince()).rows.length, 1)
     let resp, doc, changes
     for (let index = 0; index < 200; index++) {
@@ -346,10 +346,10 @@ describe('Fireproof', () => {
       })
       assert(resp.id, `Failed to obtain resp.id for _id: ${id}`)
 
-      console.log(`vis for update id: ${id}, index:`, index)
-      for await (const line of database.vis()) {
-        console.log(line)
-      }
+      // console.log(`vis for update id: ${id}, index:`, index)
+      // for await (const line of database.vis()) {
+      //   console.log(line)
+      // }
 
       doc = await database.get(resp.id).catch(e => {
         console.log('failed', e)
@@ -379,7 +379,7 @@ describe('Fireproof', () => {
       console.log('changes: ', index, changes.rows.length, JSON.stringify(changes.rows))
       assert.equal(changes.rows.length, index + 2, `failed on ${index}, with ${changes.rows.length} ${id}`)
     }
-  }).timeout(20000)
+  }).timeout(30000)
 
   it('concurrent transactions', async () => {
     assert.equal((await database.changesSince()).rows.length, 1)

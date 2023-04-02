@@ -167,8 +167,8 @@ export default class DbIndex {
   }
 
   async #innerUpdateIndex (inBlocks) {
-    const callTag = Math.random().toString(36).substring(4)
-    console.log(`#updateIndex ${callTag} >`, this.instanceId, this.dbHead?.toString(), this.dbIndexRoot?.cid.toString(), this.indexByIdRoot?.cid.toString())
+    // const callTag = Math.random().toString(36).substring(4)
+    // console.log(`#updateIndex ${callTag} >`, this.instanceId, this.dbHead?.toString(), this.dbIndexRoot?.cid.toString(), this.indexByIdRoot?.cid.toString())
     // todo remove this hack
     if (ALWAYS_REBUILD) {
       this.dbHead = null // hack
@@ -177,7 +177,7 @@ export default class DbIndex {
     }
     const result = await this.database.changesSince(this.dbHead) // {key, value, del}
     if (result.rows.length === 0) {
-      console.log(`#updateIndex ${callTag} < no changes`)
+      // console.log(`#updateIndex ${callTag} < no changes`)
       this.dbHead = result.clock
       return
     }
@@ -186,7 +186,6 @@ export default class DbIndex {
         const oldChangeEntries = await this.indexById.getMany(result.rows.map(({ key }) => key))
 
         const oldIndexEntries = oldChangeEntries.result.map((key) => ({ key, del: true }))
-        console.log('oldIndexEntries', oldIndexEntries)
         const removalResult = await bulkIndex(blocks, this.dbIndexRoot, this.dbIndex, oldIndexEntries, dbIndexOpts)
         this.dbIndexRoot = removalResult.root
         this.dbIndex = removalResult.dbIndex
@@ -204,7 +203,6 @@ export default class DbIndex {
       const indexEntries = indexEntriesForChanges(result.rows, this.mapFun)
 
       const byIdIndexEntries = indexEntries.map(({ key }) => ({ key: key[1], value: key }))
-      console.log('byIdIndexEntries', this.indexById?.constructor.name, byIdIndexEntries)
 
       const addFutureRemovalsResult = await bulkIndex(blocks, this.indexByIdRoot, this.indexById, byIdIndexEntries, idIndexOpts)
       this.indexByIdRoot = addFutureRemovalsResult.root
@@ -216,7 +214,7 @@ export default class DbIndex {
       this.dbIndex = updateIndexResult.dbIndex
       this.dbHead = result.clock
     })
-    console.log(`#updateIndex ${callTag} <`, this.instanceId, this.dbHead?.toString(), this.dbIndexRoot?.cid.toString(), this.indexByIdRoot?.cid.toString())
+    // console.log(`#updateIndex ${callTag} <`, this.instanceId, this.dbHead?.toString(), this.dbIndexRoot?.cid.toString(), this.indexByIdRoot?.cid.toString())
   }
 }
 
@@ -267,7 +265,6 @@ async function doIndexQuery (blocks, dbIndexRoot, dbIndex, query) {
     return dbIndex.range(...encodedRange)
   } else if (query.key) {
     const encodedKey = charwise.encode(query.key)
-    console.log('getting key', encodedKey)
     return dbIndex.get(encodedKey)
   }
 }
