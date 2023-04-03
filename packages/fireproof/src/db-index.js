@@ -182,34 +182,19 @@ export default class DbIndex {
       return
     }
     await doTransaction('#updateIndex', inBlocks, async (blocks) => {
+      let oldIndexEntries = []
+      let removeByIdIndexEntries = []
       if (this.dbHead) { // need a maybe load
         const oldChangeEntries = await this.indexById.getMany(result.rows.map(({ key }) => key))
-
-        const oldIndexEntries = oldChangeEntries.result.map((key) => ({ key, del: true }))
-        const removalResult = await bulkIndex(blocks, this.dbIndexRoot, this.dbIndex, oldIndexEntries, dbIndexOpts)
-        this.dbIndexRoot = removalResult.root
-        this.dbIndex = removalResult.dbIndex
-        // const removeByIdIndexEntries = oldIndexEntries.map(({ key }) => ({ key: key[1], del: true }))
-        // const purgedRemovalResults = await bulkIndex(
-        //   blocks,
-        //   this.indexByIdRoot,
-        //   this.indexById,
-        //   removeByIdIndexEntries,
-        //   opts
-        // )
-        // this.indexByIdRoot = purgedRemovalResults.root
-        // this.indexById = purgedRemovalResults.dbIndex
+        oldIndexEntries = oldChangeEntries.result.map((key) => ({ key, del: true }))
+        removeByIdIndexEntries = oldIndexEntries.map(({ key }) => ({ key: key[1], del: true }))
       }
       const indexEntries = indexEntriesForChanges(result.rows, this.mapFun)
-
       const byIdIndexEntries = indexEntries.map(({ key }) => ({ key: key[1], value: key }))
-
-      const addFutureRemovalsResult = await bulkIndex(blocks, this.indexByIdRoot, this.indexById, byIdIndexEntries, idIndexOpts)
+      const addFutureRemovalsResult = await bulkIndex(blocks, this.indexByIdRoot, this.indexById, removeByIdIndexEntries.concat(byIdIndexEntries), idIndexOpts)
+      const updateIndexResult = await bulkIndex(blocks, this.dbIndexRoot, this.dbIndex, oldIndexEntries.concat(indexEntries), dbIndexOpts)
       this.indexByIdRoot = addFutureRemovalsResult.root
       this.indexById = addFutureRemovalsResult.dbIndex
-
-      const updateIndexResult = await bulkIndex(blocks, this.dbIndexRoot, this.dbIndex, indexEntries, dbIndexOpts)
-
       this.dbIndexRoot = updateIndexResult.root
       this.dbIndex = updateIndexResult.dbIndex
       this.dbHead = result.clock
