@@ -207,7 +207,7 @@ export async function root (inBlocks, head) {
   const bulkOperations = bulkFromEvents(sorted)
   const { root: newProllyRootNode, blocks: newBlocks } = await prollyRootNode.bulk(bulkOperations)
   // const prollyRootBlock = await newProllyRootNode.block
-  console.log('newBlocks', newBlocks.map((nb) => nb.cid.toString()))
+  // console.log('newBlocks', newBlocks.map((nb) => nb.cid.toString()))
   // todo maybe these should go to a temp blockstore?
   await doTransaction('root', inBlocks, async (transactionBlockstore) => {
     const { bigPut } = makeGetAndPutBlock(transactionBlockstore)

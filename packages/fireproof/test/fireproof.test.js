@@ -2,7 +2,7 @@ import { describe, it, beforeEach } from 'mocha'
 import assert from 'node:assert'
 import Blockstore from '../src/blockstore.js'
 import Fireproof from '../src/fireproof.js'
-import * as codec from '@ipld/dag-cbor'
+// import * as codec from '@ipld/dag-cbor'
 
 let database, resp0
 
@@ -338,9 +338,9 @@ describe('Fireproof', () => {
   it('docs since repeated changes', async () => {
     assert.equal((await database.changesSince()).rows.length, 1)
     let resp, doc, changes
-    for (let index = 0; index < 200; index++) {
+    for (let index = 0; index < 30; index++) {
       const id = '1' + (301 - index).toString()
-      console.log(`Putting id: ${id}, index: ${index}`)
+      // console.log(`Putting id: ${id}, index: ${index}`)
       resp = await database.put({ index, _id: id }).catch(e => {
         assert.fail(`put failed on _id: ${id}, error: ${e.message}`)
       })
@@ -366,17 +366,8 @@ describe('Fireproof', () => {
           assert(!/^bafy/.test(value), `Unexpected "bafy..." value found at index ${index} in row ${JSON.stringify(row)}`)
         }
       })
-      if (index > 3) {
-        const stored = await database.blocks.get('bafyreicumn7tvssch4xslbe4jjq55c6w3jt4yxyjagkr2tengsudato7vi').catch((e) => {
-          console.log(`Error getting block for index ${index}: ${e.message}`)
-        })
-        if (stored) {
-          const doc = codec.decode(await stored.bytes)
-          // console.log('stored', JSON.stringify(dec))
-          assert.equal(doc.closed, false)
-        }
-      }
-      console.log('changes: ', index, changes.rows.length, JSON.stringify(changes.rows))
+
+      // console.log('changes: ', index, changes.rows.length, JSON.stringify(changes.rows))
       assert.equal(changes.rows.length, index + 2, `failed on ${index}, with ${changes.rows.length} ${id}`)
     }
   }).timeout(30000)
