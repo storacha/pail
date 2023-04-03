@@ -217,24 +217,25 @@ async function bulkIndex (blocks, inRoot, inDBindex, indexEntries, opts) {
   let returnRootBlock
   let returnNode
   if (!inDBindex) {
-    // maybe load from root?
-    for await (const node of await create({ get: getBlock, list: indexEntries, ...opts })) {
-      const block = await node.block
-      await putBlock(block.cid, block.bytes)
-      returnRootBlock = block
-      returnNode = node
+    const cid = inRoot && inRoot.cid
+    if (!cid) {
+      for await (const node of await create({ get: getBlock, list: indexEntries, ...opts })) {
+        const block = await node.block
+        await putBlock(block.cid, block.bytes)
+        returnRootBlock = block
+        returnNode = node
+      }
+      return { dbIndex: returnNode, root: returnRootBlock }
     }
-  } else {
-    // const dbIndex = await load({ cid: inRoot.cid, get: getBlock, ...opts }) // todo load from root on refresh
-    // if (!inDBindex) throw new Error('no dbIndex')
-    const { root, blocks } = await inDBindex.bulk(indexEntries)
-    returnRootBlock = await root.block // remove superstition?
-    returnNode = root
-    for await (const block of blocks) {
-      await putBlock(block.cid, block.bytes)
-    }
-    await putBlock(returnRootBlock.cid, returnRootBlock.bytes)
+    inDBindex = await load({ cid, get: getBlock, ...dbIndexOpts })
   }
+  const { root, blocks: newBlocks } = await inDBindex.bulk(indexEntries)
+  returnRootBlock = await root.block // remove superstition?
+  returnNode = root
+  for await (const block of newBlocks) {
+    await putBlock(block.cid, block.bytes)
+  }
+  await putBlock(returnRootBlock.cid, returnRootBlock.bytes)
   return { dbIndex: returnNode, root: returnRootBlock }
 }
 
