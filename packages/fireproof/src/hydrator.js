@@ -37,4 +37,15 @@ export default class Hydrator {
     })
     return snappedDb
   }
+
+  static async zoom (database, clock) {
+    ;([...database.indexes.values()]).forEach(index => {
+      index.indexById = { root: null, cid: null }
+      index.indexByKey = { root: null, cid: null }
+      index.dbHead = null
+    })
+    database.clock = clock.map(c => parseCID(c))
+    await database.notifyReset()
+    return database
+  }
 }

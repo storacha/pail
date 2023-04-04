@@ -62,7 +62,7 @@ export default class Fireproof {
   }
 
   /**
-   * Move the current instance to a new point in time. This triggers a notification to all listeners
+   * Triggers a notification to all listeners
    * of the Fireproof instance so they can repaint UI, etc.
    * @param {CID[] } clock
    *    Clock to use for the snapshot.
@@ -70,10 +70,8 @@ export default class Fireproof {
    * @memberof Fireproof
    * @instance
    */
-  async setClock (clock) {
-    // console.log('setClock', this.instanceId, clock)
-    this.clock = clock.map((item) => (item['/'] ? item['/'] : item))
-    await this.#notifyListeners({ reset: true, clock })
+  async notifyReset () {
+    await this.#notifyListeners({ reset: true, clock: this.clock })
   }
 
   /**
