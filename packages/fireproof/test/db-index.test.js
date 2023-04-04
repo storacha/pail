@@ -78,7 +78,7 @@ describe('DbIndex query', () => {
     // console.x('bresult.rows', bresult.rows)
     assert.equal(bresult.rows.length, 6, 'all row matched')
 
-    const snap = Hydrator.snapshot(database)
+    const snapClock = database.clock
 
     const notYet = await database.get('xxxx-3c3a-4b5e-9c1c-8c5c0c5c0c5c').catch((e) => e)
     assert.equal(notYet.message, 'Not found', 'not yet there')
@@ -91,6 +91,8 @@ describe('DbIndex query', () => {
     assert(gotX)
     assert(gotX.name === 'Xander', 'got Xander')
     console.x('got X')
+
+    const snap = Hydrator.snapshot(database, snapClock)
 
     const aliceOld = await snap.get('a1s3b32a-3c3a-4b5e-9c1c-8c5c0c5c0c5c')// .catch((e) => e)
     console.x('aliceOld', aliceOld)
