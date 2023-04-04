@@ -1,9 +1,13 @@
-import { create, load } from 'prolly-trees/db-index'
+// import { create, load } from 'prolly-trees/db-index'
+import { create, load } from '../../../../prolly-trees/src/db-index.js'
+
 import { sha256 as hasher } from 'multiformats/hashes/sha2'
 import { nocache as cache } from 'prolly-trees/cache'
 import { bf, simpleCompare } from 'prolly-trees/utils'
 import { makeGetBlock } from './prolly.js'
 import { cidsToProof } from './fireproof.js'
+import { CID } from 'multiformats'
+
 import * as codec from '@ipld/dag-cbor'
 // import { create as createBlock } from 'multiformats/block'
 import { doTransaction } from './blockstore.js'
@@ -111,6 +115,8 @@ export default class DbIndex {
      */
     this.mapFun = mapFun
 
+    this.database.indexes.set(mapFun.toString(), this)
+
     this.indexById = { root: null, cid: null }
     this.indexByKey = { root: null, cid: null }
 
@@ -119,6 +125,21 @@ export default class DbIndex {
     this.instanceId = this.database.instanceId + `.DbIndex.${Math.random().toString(36).substring(2, 7)}`
 
     this.updateIndexPromise = null
+  }
+
+  toJSON () {
+    return { code: this.mapFun?.toString(), clock: { db: this.dbHead?.map(cid => cid.toString()), byId: this.indexById.cid?.toString(), byKey: this.indexByKey.cid?.toString() } }
+  }
+
+  static fromJSON (database, { code, clock: { byId, byKey, db } }) {
+    let mapFun
+    // eslint-disable-next-line
+    eval("mapFun = "+ code)
+    const index = new DbIndex(database, mapFun)
+    index.indexById.cid = CID.parse(byId)
+    index.indexByKey.cid = CID.parse(byKey)
+    index.dbHead = db.map(cid => CID.parse(cid))
+    return index
   }
 
   /**
@@ -176,7 +197,7 @@ export default class DbIndex {
     }
     const result = await this.database.changesSince(this.dbHead) // {key, value, del}
     if (result.rows.length === 0) {
-      // console.log(`#updateIndex ${callTag} < no changes`)
+      // console.log('#updateIndex < no changes')
       this.dbHead = result.clock
       return
     }
