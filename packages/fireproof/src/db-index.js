@@ -1,5 +1,5 @@
-// import { create, load } from 'prolly-trees/db-index'
-import { create, load } from '../../../../prolly-trees/src/db-index.js'
+import { create, load } from 'prolly-trees/db-index'
+// import { create, load } from '../../../../prolly-trees/src/db-index.js'
 
 import { sha256 as hasher } from 'multiformats/hashes/sha2'
 import { nocache as cache } from 'prolly-trees/cache'
