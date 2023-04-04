@@ -1,6 +1,6 @@
 {
   "name": "@fireproof/core",
-  "version": "0.0.10",
+  "version": "0.1.0",
   "description": "Realtime database for IPFS",
   "main": "index.js",
   "type": "module",
@@ -10,6 +10,7 @@
     "test:watch": "npm run test:mocha -- -w --parallel test/*.test.js",
     "coverage": "c8 -r html -r text npm test",
     "prepublishOnly" : "cp ../../README.md .",
+    "postpublish": "rm README.md",
     "lint": "standard",
     "lint:fix": "standard --fix"
   },
