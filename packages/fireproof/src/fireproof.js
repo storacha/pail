@@ -42,6 +42,26 @@ export default class Fireproof {
   }
 
   /**
+   * Renders the Fireproof instance as a JSON object.
+   * @returns {Object} - The JSON representation of the Fireproof instance. Includes clock heads for the database and its indexes.
+   * @memberof Fireproof
+   * @instance
+   */
+  toJSON () {
+    // todo this also needs to return the index roots...
+    return {
+      clock: this.clock.map(cid => cid.toString()),
+      name: this.name,
+      indexes: [...this.indexes.values()].map((index) => index.toJSON())
+    }
+  }
+
+  hydrate ({ clock, name }) {
+    this.name = name
+    this.clock = clock
+  }
+
+  /**
    * Returns a snapshot of the current Fireproof instance as a new instance.
    * @function snapshot
    * @param {CID[]} clock - The Merkle clock head to use for the snapshot.
@@ -69,21 +89,6 @@ export default class Fireproof {
     // console.log('setClock', this.instanceId, clock)
     this.clock = clock.map((item) => (item['/'] ? item['/'] : item))
     await this.#notifyListeners({ reset: true, clock })
-  }
-
-  /**
-   * Renders the Fireproof instance as a JSON object.
-   * @returns {Object} - The JSON representation of the Fireproof instance. Includes clock heads for the database and its indexes.
-   * @memberof Fireproof
-   * @instance
-   */
-  toJSON () {
-    // todo this also needs to return the index roots...
-    return {
-      clock: this.clock.map(cid => cid.toString()),
-      name: this.name,
-      indexes: [...this.indexes.values()].map((index) => index.toJSON())
-    }
   }
 
   /**

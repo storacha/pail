@@ -6,7 +6,6 @@ import { nocache as cache } from 'prolly-trees/cache'
 import { bf, simpleCompare } from 'prolly-trees/utils'
 import { makeGetBlock } from './prolly.js'
 import { cidsToProof } from './fireproof.js'
-import { CID } from 'multiformats'
 
 import * as codec from '@ipld/dag-cbor'
 // import { create as createBlock } from 'multiformats/block'
@@ -103,7 +102,8 @@ const indexEntriesForChanges = (changes, mapFun) => {
  *
  */
 export default class DbIndex {
-  constructor (database, mapFun) {
+  constructor (database, mapFun, clock) {
+    // console.log('DbIndex constructor', database.constructor.name, typeof mapFun, clock)
     /**
      * The database instance to DbIndex.
      * @type {Fireproof}
@@ -113,33 +113,58 @@ export default class DbIndex {
      * The map function to apply to each entry in the database.
      * @type {Function}
      */
-    this.mapFun = mapFun
 
-    this.database.indexes.set(mapFun.toString(), this)
-
+    if (typeof mapFun === 'string') {
+      this.mapFunString = mapFun
+    } else {
+      this.mapFun = mapFun
+      this.mapFunString = mapFun.toString()
+    }
     this.indexById = { root: null, cid: null }
     this.indexByKey = { root: null, cid: null }
-
     this.dbHead = null
+    if (clock) {
+      this.indexById.cid = clock.byId
+      this.indexByKey.cid = clock.byKey
+      this.dbHead = clock.db
+    }
+
+    DbIndex.registerWithDatabase(this, this.database)
 
     this.instanceId = this.database.instanceId + `.DbIndex.${Math.random().toString(36).substring(2, 7)}`
 
     this.updateIndexPromise = null
   }
 
+  static registerWithDatabase (inIndex, database) {
+    if (database.indexes.has(inIndex.mapFunString)) {
+      // merge our inIndex code with the inIndex clock or vice versa
+      // keep the code instance, discard the clock instance
+      const existingIndex = database.indexes.get(inIndex.mapFunString)
+      if (existingIndex.mapFun) { // this one also has other config
+        console.log('DbIndex.registerWithDatabase live existingIndex', database.constructor.name, existingIndex.indexById.cid, typeof existingIndex.mapFun)
+        existingIndex.dbHead = inIndex.dbHead
+        existingIndex.indexById.cid = inIndex.indexById.cid
+        existingIndex.indexByKey.cid = inIndex.indexByKey.cid
+      } else {
+        console.log('DbIndex.registerWithDatabase live? inIndex', database.constructor.name, inIndex.indexById.cid, typeof inIndex.mapFun)
+        inIndex.dbHead = existingIndex.dbHead
+        inIndex.indexById.cid = existingIndex.indexById.cid
+        inIndex.indexByKey.cid = existingIndex.indexByKey.cid
+        database.indexes.set(inIndex.mapFunString, inIndex)
+      }
+    } else {
+      database.indexes.set(inIndex.mapFunString, inIndex)
+    }
+  }
+
   toJSON () {
     return { code: this.mapFun?.toString(), clock: { db: this.dbHead?.map(cid => cid.toString()), byId: this.indexById.cid?.toString(), byKey: this.indexByKey.cid?.toString() } }
   }
 
-  static fromJSON (database, { code, clock: { byId, byKey, db } }) {
-    let mapFun
-    // eslint-disable-next-line
-    eval("mapFun = "+ code)
-    const index = new DbIndex(database, mapFun)
-    index.indexById.cid = CID.parse(byId)
-    index.indexByKey.cid = CID.parse(byKey)
-    index.dbHead = db.map(cid => CID.parse(cid))
-    return index
+  static fromJSON (database, { code, clock }) {
+    // console.log('DbIndex.fromJSON', database.constructor.name, code, clock)
+    return new DbIndex(database, code, clock)
   }
 
   /**
@@ -195,8 +220,8 @@ export default class DbIndex {
   }
 
   async #innerUpdateIndex (inBlocks) {
-    // const callTag = Math.random().toString(36).substring(4)
-    // console.log(`#updateIndex ${callTag} >`, this.instanceId, this.dbHead?.toString(), this.dbIndexRoot?.cid.toString(), this.indexByIdRoot?.cid.toString())
+    const callTag = Math.random().toString(36).substring(4)
+    console.log(`#updateIndex ${callTag} >`, this.instanceId, this.dbHead?.toString(), this.indexByKey.cid?.toString(), this.indexById.cid?.toString())
     // todo remove this hack
     if (ALWAYS_REBUILD) {
       this.dbHead = null // hack
@@ -212,7 +237,7 @@ export default class DbIndex {
     // console.time(callTag + '.doTransaction#updateIndex')
 
     if (result.rows.length === 0) {
-      // console.log('#updateIndex < no changes')
+      console.log('#updateIndex < no changes')
       this.dbHead = result.clock
       return
     }
@@ -223,6 +248,9 @@ export default class DbIndex {
         const oldChangeEntries = await this.indexById.root.getMany(result.rows.map(({ key }) => key))
         oldIndexEntries = oldChangeEntries.result.map((key) => ({ key, del: true }))
         removeByIdIndexEntries = oldIndexEntries.map(({ key }) => ({ key: key[1], del: true }))
+      }
+      if (!this.mapFun) {
+        throw new Error('No live map function installed for index, cannot update. Make sure your index definition runs before any queries.' + (this.mapFunString ? ' Your code should match the stored map function source:\n' + this.mapFunString : ''))
       }
       const indexEntries = indexEntriesForChanges(result.rows, this.mapFun)
       const byIdIndexEntries = indexEntries.map(({ key }) => ({ key: key[1], value: key }))

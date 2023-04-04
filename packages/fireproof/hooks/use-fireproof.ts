@@ -2,7 +2,8 @@
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import { useEffect, useState, createContext } from 'react'
-import { Fireproof, Listener } from '../index'
+import { Fireproof, Listener, Hydrator } from '../index'
+
 
 export interface FireproofCtxValue {
   addSubscriber: (label: String, fn: Function) => void
@@ -18,6 +19,7 @@ export const FireproofCtx = createContext<FireproofCtxValue>({
 const inboundSubscriberQueue = new Map()
 const database = Fireproof.storage()
 const listener = new Listener(database)
+let startedSetup = false;
 
 /**
  * @function useFireproof
@@ -30,7 +32,7 @@ export function useFireproof(defineDatabaseFn: Function, setupDatabaseFn: Functi
   const [ready, setReady] = useState(false)
   defineDatabaseFn = defineDatabaseFn || (() => {})
   setupDatabaseFn = setupDatabaseFn || (() => {})
-
+  // console.log('useFireproof', database, ready)
   if (!ready) {
     defineDatabaseFn(database)
   }
@@ -47,11 +49,16 @@ export function useFireproof(defineDatabaseFn: Function, setupDatabaseFn: Functi
   useEffect(() => {
     const doSetup = async () => {
       if (ready) return
+      console.log('useFireproof setup', startedSetup, database.name)
+      if (startedSetup) return
+      startedSetup = true
       const fp = localGet('fireproof')
       if (fp) {
-        const { clock } = JSON.parse(fp)
+        const serialized = JSON.parse(fp)
+        console.log('serialized', serialized)
         console.log("Loading previous database clock. (localStorage.removeItem('fireproof') to reset)")
-        await database.setClock(clock)
+        Hydrator.fromJSON(serialized, database)
+        // await database.setClock(clock)
         try {
           const changes = await database.changesSince()
           if (changes.rows.length < 2) {
