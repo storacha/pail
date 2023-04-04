@@ -128,38 +128,42 @@ export default class DbIndex {
       this.indexByKey.cid = clock.byKey
       this.dbHead = clock.db
     }
-
-    DbIndex.registerWithDatabase(this, this.database)
-
     this.instanceId = this.database.instanceId + `.DbIndex.${Math.random().toString(36).substring(2, 7)}`
-
     this.updateIndexPromise = null
+    DbIndex.registerWithDatabase(this, this.database)
   }
 
   static registerWithDatabase (inIndex, database) {
+    // console.log('.reg > in Index', inIndex.instanceId, { live: !!inIndex.mapFun }, inIndex.indexByKey, inIndex.mapFunString)
     if (database.indexes.has(inIndex.mapFunString)) {
       // merge our inIndex code with the inIndex clock or vice versa
       // keep the code instance, discard the clock instance
       const existingIndex = database.indexes.get(inIndex.mapFunString)
+      // console.log('.reg - existingIndex', existingIndex.instanceId, { live: !!inIndex.mapFun }, existingIndex.indexByKey)
       if (existingIndex.mapFun) { // this one also has other config
-        console.log('DbIndex.registerWithDatabase live existingIndex', database.constructor.name, existingIndex.indexById.cid, typeof existingIndex.mapFun)
         existingIndex.dbHead = inIndex.dbHead
         existingIndex.indexById.cid = inIndex.indexById.cid
         existingIndex.indexByKey.cid = inIndex.indexByKey.cid
       } else {
-        console.log('DbIndex.registerWithDatabase live? inIndex', database.constructor.name, inIndex.indexById.cid, typeof inIndex.mapFun)
+        // console.log('.reg use inIndex with existingIndex clock')
         inIndex.dbHead = existingIndex.dbHead
         inIndex.indexById.cid = existingIndex.indexById.cid
         inIndex.indexByKey.cid = existingIndex.indexByKey.cid
         database.indexes.set(inIndex.mapFunString, inIndex)
       }
     } else {
+      // console.log('.reg - fresh')
       database.indexes.set(inIndex.mapFunString, inIndex)
     }
+    // console.log('.reg after', JSON.stringify([...database.indexes.values()].map(i => [i.instanceId, typeof i.mapFun, i.indexByKey, i.indexById])))
   }
 
   toJSON () {
-    return { code: this.mapFun?.toString(), clock: { db: this.dbHead?.map(cid => cid.toString()), byId: this.indexById.cid?.toString(), byKey: this.indexByKey.cid?.toString() } }
+    const indexJson = { code: this.mapFun?.toString(), clock: { db: null, byId: null, byKey: null } }
+    indexJson.clock.db = this.dbHead?.map(cid => cid.toString())
+    indexJson.clock.byId = this.indexById.cid?.toString()
+    indexJson.clock.byKey = this.indexByKey.cid?.toString()
+    return indexJson
   }
 
   static fromJSON (database, { code, clock }) {
@@ -191,6 +195,7 @@ export default class DbIndex {
 
     // }
     // console.time(callId + '.doIndexQuery')
+    // console.log('query', query)
     const response = await doIndexQuery(this.database.blocks, this.indexByKey, query)
     // console.timeEnd(callId + '.doIndexQuery')
 
@@ -220,13 +225,13 @@ export default class DbIndex {
   }
 
   async #innerUpdateIndex (inBlocks) {
-    const callTag = Math.random().toString(36).substring(4)
-    console.log(`#updateIndex ${callTag} >`, this.instanceId, this.dbHead?.toString(), this.indexByKey.cid?.toString(), this.indexById.cid?.toString())
+    // const callTag = Math.random().toString(36).substring(4)
+    // console.log(`#updateIndex ${callTag} >`, this.instanceId, this.dbHead?.toString(), this.indexByKey.cid?.toString(), this.indexById.cid?.toString())
     // todo remove this hack
     if (ALWAYS_REBUILD) {
-      this.dbHead = null // hack
-      this.indexByKey = null // hack
-      this.dbIndexRoot = null
+      this.indexById = { root: null, cid: null }
+      this.indexByKey = { root: null, cid: null }
+      this.dbHead = null
     }
     // console.log('dbHead', this.dbHead)
     // console.time(callTag + '.changesSince')
@@ -235,16 +240,19 @@ export default class DbIndex {
     // console.log('result.rows.length', result.rows.length)
 
     // console.time(callTag + '.doTransaction#updateIndex')
+    // console.log('#updateIndex changes length', result.rows.length)
 
     if (result.rows.length === 0) {
-      console.log('#updateIndex < no changes')
+      // console.log('#updateIndex < no changes', result.clock)
       this.dbHead = result.clock
       return
     }
     await doTransaction('#updateIndex', inBlocks, async (blocks) => {
       let oldIndexEntries = []
       let removeByIdIndexEntries = []
-      if (this.dbHead) { // need a maybe load
+      await loadIndex(blocks, this.indexById, idIndexOpts)
+      await loadIndex(blocks, this.indexByKey, dbIndexOpts)
+      if (this.dbHead) {
         const oldChangeEntries = await this.indexById.root.getMany(result.rows.map(({ key }) => key))
         oldIndexEntries = oldChangeEntries.result.map((key) => ({ key, del: true }))
         removeByIdIndexEntries = oldIndexEntries.map(({ key }) => ({ key: key[1], del: true }))
@@ -259,7 +267,7 @@ export default class DbIndex {
       this.dbHead = result.clock
     })
     // console.timeEnd(callTag + '.doTransaction#updateIndex')
-    // console.log(`#updateIndex ${callTag} <`, this.instanceId, this.dbHead?.toString(), this.dbIndexRoot?.cid.toString(), this.indexByIdRoot?.cid.toString())
+    // console.log(`#updateIndex ${callTag} <`, this.instanceId, this.dbHead?.toString(), this.indexByKey.cid?.toString(), this.indexById.cid?.toString())
   }
 }
 
@@ -299,13 +307,18 @@ async function bulkIndex (blocks, inIndex, indexEntries, opts) {
   return { root: returnNode, cid: returnRootBlock.cid }
 }
 
-async function doIndexQuery (blocks, indexByKey, query) {
-  if (!indexByKey.root) {
-    const cid = indexByKey.cid
-    if (!cid) return { result: [] }
+async function loadIndex (blocks, index, indexOpts) {
+  if (!index.root) {
+    const cid = index.cid
+    if (!cid) return
     const { getBlock } = makeGetBlock(blocks)
-    indexByKey.root = await load({ cid, get: getBlock, ...dbIndexOpts })
+    index.root = await load({ cid, get: getBlock, ...indexOpts })
   }
+  return index.root
+}
+
+async function doIndexQuery (blocks, indexByKey, query) {
+  await loadIndex(blocks, indexByKey, dbIndexOpts)
   if (query.range) {
     const encodedRange = query.range.map((key) => charwise.encode(key))
     return indexByKey.root.range(...encodedRange)

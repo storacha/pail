@@ -33,15 +33,14 @@ export function useFireproof(defineDatabaseFn: Function, setupDatabaseFn: Functi
   defineDatabaseFn = defineDatabaseFn || (() => {})
   setupDatabaseFn = setupDatabaseFn || (() => {})
   // console.log('useFireproof', database, ready)
-  if (!ready) {
-    defineDatabaseFn(database)
-  }
+
 
   const addSubscriber = (label: String, fn: Function) => {
     inboundSubscriberQueue.set(label, fn)
   }
 
   const listenerCallback = async () => {
+    // console.log ('listenerCallback', JSON.stringify(database))
     localSet('fireproof', JSON.stringify(database))
     for (const [, fn] of inboundSubscriberQueue) fn()
   }
@@ -49,25 +48,25 @@ export function useFireproof(defineDatabaseFn: Function, setupDatabaseFn: Functi
   useEffect(() => {
     const doSetup = async () => {
       if (ready) return
-      console.log('useFireproof setup', startedSetup, database.name)
       if (startedSetup) return
       startedSetup = true
+      defineDatabaseFn(database) // define indexes before querying them
       const fp = localGet('fireproof')
       if (fp) {
         const serialized = JSON.parse(fp)
-        console.log('serialized', serialized)
+        // console.log('serialized', JSON.stringify(serialized.indexes.map(c => c.clock)))
         console.log("Loading previous database clock. (localStorage.removeItem('fireproof') to reset)")
         Hydrator.fromJSON(serialized, database)
         // await database.setClock(clock)
         try {
           const changes = await database.changesSince()
           if (changes.rows.length < 2) {
-            console.log('Resetting database')
+            // console.log('Resetting database')
             throw new Error('Resetting database')
           }
         } catch (e) {
           console.error(`Error loading previous database clock. ${fp} Resetting.`, e)
-          await database.setClock([])
+          await database.setClock([]) // todo this should be resetClock and also reset the indexes
           await setupDatabaseFn(database)
           localSet('fireproof', JSON.stringify(database))
         }

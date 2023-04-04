@@ -52,7 +52,7 @@ export default class Fireproof {
     return {
       clock: this.clock.map(cid => cid.toString()),
       name: this.name,
-      indexes: [...this.indexes.values()].map((index) => index.toJSON())
+      indexes: [...this.indexes.values()].map(index => index.toJSON())
     }
   }
 
