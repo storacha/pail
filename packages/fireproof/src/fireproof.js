@@ -38,6 +38,7 @@ export default class Fireproof {
     this.clock = clock
     this.config = config
     this.authCtx = authCtx
+    this.indexes = new Map()
   }
 
   /**
@@ -78,7 +79,11 @@ export default class Fireproof {
    */
   toJSON () {
     // todo this also needs to return the index roots...
-    return { clock: this.clock }
+    return {
+      clock: this.clock.map(cid => cid.toString()),
+      name: this.name,
+      indexes: [...this.indexes.values()].map((index) => index.toJSON())
+    }
   }
 
   /**

@@ -404,4 +404,11 @@ describe('Fireproof', () => {
     // await sleep(1000)
     assert.equal((await database.changesSince()).rows.length, 2)
   }).timeout(20000)
+  it('serialize database', async () => {
+    await database.put({ _id: 'rehy', name: 'drate' })
+    assert.equal((await database.changesSince()).rows.length, 2)
+    const serialized = JSON.parse(JSON.stringify(database))
+    assert.equal(serialized.name, 'helloName')
+    assert.equal(serialized.clock.length, 1)
+  })
 })
