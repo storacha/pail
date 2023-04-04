@@ -165,6 +165,7 @@ export async function put (inBlocks, head, event, options) {
   // Otherwise, we find the common ancestor and update the root and other blocks
   const events = new EventFetcher(blocks)
   // todo this is returning more events than necessary, lets define the desired semantics from the top down
+  // good semantics mean we can cache the results of this call
   const { ancestor, sorted } = await findCommonAncestorWithSortedEvents(events, head)
   // console.log('sorted', JSON.stringify(sorted.map(({ value: { data: { key, value } } }) => ({ key, value }))))
   const prollyRootNode = await prollyRootFromAncestor(events, ancestor, getBlock)

@@ -206,28 +206,34 @@ export async function * vis (blocks, head, options = {}) {
 }
 
 export async function findEventsToSync (blocks, head) {
-  const callTag = Math.random().toString(36).substring(7)
+  // const callTag = Math.random().toString(36).substring(7)
   const events = new EventFetcher(blocks)
+  // console.time(callTag + '.findCommonAncestorWithSortedEvents')
   const { ancestor, sorted } = await findCommonAncestorWithSortedEvents(events, head)
-  console.log('sorted', sorted.length)
-  console.time(callTag + '.findCommonAncestorWithSortedEvents')
+  // console.timeEnd(callTag + '.findCommonAncestorWithSortedEvents')
+  // console.log('sorted', sorted.length)
+  // console.time(callTag + '.contains')
   const toSync = await asyncFilter(sorted, async (uks) => !(await contains(events, ancestor, uks.cid)))
-
-  console.timeEnd(callTag + '.findCommonAncestorWithSortedEvents')
+  // console.timeEnd(callTag + '.contains')
 
   return { cids: events.cids, events: toSync }
 }
 
 const asyncFilter = async (arr, predicate) =>
+
   Promise.all(arr.map(predicate)).then((results) => arr.filter((_v, index) => results[index]))
 
 export async function findCommonAncestorWithSortedEvents (events, children) {
+  // const callTag = Math.random().toString(36).substring(7)
+  // console.time(callTag + '.findCommonAncestor')
   const ancestor = await findCommonAncestor(events, children)
+  // console.timeEnd(callTag + '.findCommonAncestor')
   if (!ancestor) {
     throw new Error('failed to find common ancestor event')
   }
-  // Sort the events by their sequence number
+  // console.time(callTag + '.findSortedEvents')
   const sorted = await findSortedEvents(events, children, ancestor)
+  // console.timeEnd(callTag + '.findSortedEvents')
   return { ancestor, sorted }
 }
 
@@ -291,6 +297,7 @@ function findCommonString (arrays) {
  * @param {import('./clock').EventLink<EventData>} tail
  */
 async function findSortedEvents (events, head, tail) {
+  // const callTag = Math.random().toString(36).substring(7)
   // get weighted events - heavier events happened first
   /** @type {Map<string, { event: import('./clock').EventBlockView<EventData>, weight: number }>} */
   const weights = new Map()
@@ -324,6 +331,7 @@ async function findSortedEvents (events, head, tail) {
     .sort((a, b) => b[0] - a[0])
     .flatMap(([, es]) => es.sort((a, b) => (String(a.cid) < String(b.cid) ? -1 : 1)))
   // console.log('sorted', sorted.map(s => s.value.data.value))
+
   return sorted
 }
 
@@ -334,6 +342,7 @@ async function findSortedEvents (events, head, tail) {
  * @returns {Promise<Array<{ event: import('./clock').EventBlockView<EventData>, depth: number }>>}
  */
 async function findEvents (events, start, end, depth = 0) {
+  // console.log('findEvents', start)
   const event = await events.get(start)
   const acc = [{ event, depth }]
   const { parents } = event.value
