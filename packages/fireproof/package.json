@@ -9,6 +9,7 @@
     "test:mocha": "mocha test/*.test.js",
     "test:watch": "npm run test:mocha -- -w --parallel test/*.test.js",
     "coverage": "c8 -r html -r text npm test",
+    "prepublishOnly" : "cp ../../README.md .",
     "lint": "standard",
     "lint:fix": "standard --fix"
   },
