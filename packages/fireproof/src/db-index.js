@@ -157,12 +157,18 @@ export default class DbIndex {
    * @instance
    */
   async query (query) {
+    const callId = Math.random().toString(36).substring(2, 7)
     // if (!root) {
     // pass a root to query a snapshot
+    console.time(callId + '.#updateIndex')
     await this.#updateIndex(this.database.blocks)
+    console.timeEnd(callId + '.#updateIndex')
 
     // }
+    console.time(callId + '.doIndexQuery')
     const response = await doIndexQuery(this.database.blocks, this.indexByKey, query)
+    console.timeEnd(callId + '.doIndexQuery')
+
     return {
       proof: { index: await cidsToProof(response.cids) },
       // TODO fix this naming upstream in prolly/db-DbIndex?
@@ -180,6 +186,8 @@ export default class DbIndex {
    */
 
   async #updateIndex (blocks) {
+    // todo this could enqueue the request and give fresh ones to all second comers -- right now it gives out stale promises while working
+    // what would it do in a world where all indexes provide a database snapshot to query?
     if (this.updateIndexPromise) return this.updateIndexPromise
     this.updateIndexPromise = this.#innerUpdateIndex(blocks)
     this.updateIndexPromise.finally(() => { this.updateIndexPromise = null })
@@ -187,7 +195,7 @@ export default class DbIndex {
   }
 
   async #innerUpdateIndex (inBlocks) {
-    // const callTag = Math.random().toString(36).substring(4)
+    const callTag = Math.random().toString(36).substring(4)
     // console.log(`#updateIndex ${callTag} >`, this.instanceId, this.dbHead?.toString(), this.dbIndexRoot?.cid.toString(), this.indexByIdRoot?.cid.toString())
     // todo remove this hack
     if (ALWAYS_REBUILD) {
@@ -195,7 +203,14 @@ export default class DbIndex {
       this.indexByKey = null // hack
       this.dbIndexRoot = null
     }
+    console.log('dbHead', this.dbHead)
+    console.time(callTag + '.changesSince')
     const result = await this.database.changesSince(this.dbHead) // {key, value, del}
+    console.timeEnd(callTag + '.changesSince')
+    console.log('result.rows.length', result.rows.length)
+
+    console.time(callTag + '.doTransaction#updateIndex')
+
     if (result.rows.length === 0) {
       // console.log('#updateIndex < no changes')
       this.dbHead = result.clock
@@ -215,6 +230,7 @@ export default class DbIndex {
       this.indexByKey = await bulkIndex(blocks, this.indexByKey, oldIndexEntries.concat(indexEntries), dbIndexOpts)
       this.dbHead = result.clock
     })
+    console.timeEnd(callTag + '.doTransaction#updateIndex')
     // console.log(`#updateIndex ${callTag} <`, this.instanceId, this.dbHead?.toString(), this.dbIndexRoot?.cid.toString(), this.indexByIdRoot?.cid.toString())
   }
 }

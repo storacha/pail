@@ -94,6 +94,7 @@ export class EventFetcher {
     /** @private */
     this._blocks = blocks
     this._cids = new CIDCounter()
+    this._cache = new Map()
   }
 
   /**
@@ -101,10 +102,15 @@ export class EventFetcher {
    * @returns {Promise<EventBlockView<T>>}
    */
   async get (link) {
+    const slink = link.toString()
+    // console.log('get', link.toString())
+    if (this._cache.has(slink)) return this._cache.get(slink)
     const block = await this._blocks.get(link)
     this._cids.add({ address: link })
     if (!block) throw new Error(`missing block: ${link}`)
-    return decodeEventBlock(block.bytes)
+    const got = decodeEventBlock(block.bytes)
+    this._cache.set(slink, got)
+    return got
   }
 
   async all () {
@@ -200,9 +206,15 @@ export async function * vis (blocks, head, options = {}) {
 }
 
 export async function findEventsToSync (blocks, head) {
+  const callTag = Math.random().toString(36).substring(7)
   const events = new EventFetcher(blocks)
   const { ancestor, sorted } = await findCommonAncestorWithSortedEvents(events, head)
+  console.log('sorted', sorted.length)
+  console.time(callTag + '.findCommonAncestorWithSortedEvents')
   const toSync = await asyncFilter(sorted, async (uks) => !(await contains(events, ancestor, uks.cid)))
+
+  console.timeEnd(callTag + '.findCommonAncestorWithSortedEvents')
+
   return { cids: events.cids, events: toSync }
 }
 
