@@ -60,7 +60,7 @@ describe('DbIndex query', () => {
     assert.equal(newDb.clock.length, 1)
     assert.equal((await newDb.changesSince()).rows.length, 7)
     const newIndex = [...newDb.indexes.values()][0]
-    assert.equal(newIndex.mapFun, `function (doc, map) {
+    assert.equal(newIndex.mapFn, `function (doc, map) {
       map(doc.age, doc.name)
     }`)
     assert.equal(newIndex.indexById.cid, 'bafyreifuz54ugnq77fur47vwv3dwab7p3gpnf5to6hlnbhv5p4kwo7auoi')

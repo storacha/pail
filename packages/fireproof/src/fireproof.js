@@ -62,21 +62,6 @@ export default class Fireproof {
   }
 
   /**
-   * Returns a snapshot of the current Fireproof instance as a new instance.
-   * @function snapshot
-   * @param {CID[]} clock - The Merkle clock head to use for the snapshot.
-   * @returns {Fireproof}
-   *    A new Fireproof instance representing the snapshot.
-   * @memberof Fireproof
-   * @instance
-   */
-  snapshot (clock) {
-    // how to handle listeners, views, and config?
-    // todo needs a test for listeners, views, and config
-    return new Fireproof(this.blocks, clock || this.clock)
-  }
-
-  /**
    * Move the current instance to a new point in time. This triggers a notification to all listeners
    * of the Fireproof instance so they can repaint UI, etc.
    * @param {CID[] } clock
@@ -300,7 +285,7 @@ export default class Fireproof {
   }
 
   setCarUploader (carUploaderFn) {
-    console.log('registering car uploader')
+    // console.log('registering car uploader')
     // https://en.wikipedia.org/wiki/Law_of_Demeter - this is a violation of the law of demeter
     this.blocks.valet.uploadFunction = carUploaderFn
   }

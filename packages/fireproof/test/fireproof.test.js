@@ -2,6 +2,7 @@ import { describe, it, beforeEach } from 'mocha'
 import assert from 'node:assert'
 import Blockstore from '../src/blockstore.js'
 import Fireproof from '../src/fireproof.js'
+import Hydrator from '../src/hydrator.js'
 // import * as codec from '@ipld/dag-cbor'
 
 let database, resp0
@@ -130,7 +131,7 @@ describe('Fireproof', () => {
     assert(response.id, 'should have id')
     assert.equal(response.id, dogKey)
     assert.equal(value._id, dogKey)
-    const oldClock = database.clock
+    const snapshot = Hydrator.snapshot(database)
 
     const avalue = await database.get(dogKey)
     assert.equal(avalue.name, value.name)
@@ -147,7 +148,6 @@ describe('Fireproof', () => {
     assert.equal(bvalue.age, 3)
     assert.equal(bvalue._id, dogKey)
 
-    const snapshot = database.snapshot(oldClock)
     const snapdoc = await snapshot.get(dogKey)
     // console.log('snapdoc', snapdoc)
     // assert(snapdoc.id, 'should have id')

@@ -1,4 +1,5 @@
 import DbIndex from './db-index.js'
+import Fireproof from './fireproof.js'
 import { CID } from 'multiformats'
 
 export default class Hydrator {
@@ -16,5 +17,15 @@ export default class Hydrator {
       })
     }
     return database
+  }
+
+  static snapshot (database) {
+    const definition = database.toJSON()
+    const withBlocks = new Fireproof(database.blocks)
+    const snappedDb = this.fromJSON(definition, withBlocks)
+    ;([...database.indexes.values()]).forEach(index => {
+      snappedDb.indexes.get(index.mapFnString).mapFn = index.mapFn
+    })
+    return snappedDb
   }
 }
