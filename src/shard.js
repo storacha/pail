@@ -70,9 +70,9 @@ export class ShardFetcher {
    * @returns {Promise<ShardBlockView>}
    */
   async get (link, prefix = '') {
-    const block = await this._blocks.get(link)
-    if (!block) throw new Error(`missing block: ${link}`)
-    return decodeShardBlock(block.bytes, prefix)
+    const bytes = await this._blocks.get(link)
+    if (!bytes) throw new Error(`missing block: ${link}`)
+    return decodeShardBlock(bytes, prefix)
   }
 }
 

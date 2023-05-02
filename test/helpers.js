@@ -30,8 +30,8 @@ export class Blockstore extends MemoryBlockstore {
    * @param {string} [prefix]
    */
   async getShardBlock (cid, prefix) {
-    const blk = await this.get(cid)
-    assert(blk)
-    return decodeShardBlock(blk.bytes, prefix)
+    const bytes = await this.get(cid)
+    assert(bytes)
+    return decodeShardBlock(bytes, prefix)
   }
 }

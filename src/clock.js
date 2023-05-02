@@ -95,9 +95,9 @@ export class EventFetcher {
    * @returns {Promise<EventBlockView<T>>}
    */
   async get (link) {
-    const block = await this._blocks.get(link)
-    if (!block) throw new Error(`missing block: ${link}`)
-    return decodeEventBlock(block.bytes)
+    const bytes = await this._blocks.get(link)
+    if (!bytes) throw new Error(`missing block: ${link}`)
+    return decodeEventBlock(bytes)
   }
 }
 

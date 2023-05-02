@@ -2,7 +2,7 @@ import { parse } from 'multiformats/link'
 
 /**
  * @typedef {{ cid: import('./link').AnyLink, bytes: Uint8Array }} AnyBlock
- * @typedef {{ get: (link: import('./link').AnyLink) => Promise<AnyBlock | undefined> }} BlockFetcher
+ * @typedef {{ get: (link: import('./link').AnyLink) => Promise<Uint8Array | undefined> }} BlockFetcher
  */
 
 /** @implements {BlockFetcher} */
@@ -21,12 +21,12 @@ export class MemoryBlockstore {
 
   /**
    * @param {import('./link').AnyLink} cid
-   * @returns {Promise<AnyBlock | undefined>}
+   * @returns {Promise<Uint8Array | undefined>}
    */
   async get (cid) {
     const bytes = this.#blocks.get(cid.toString())
     if (!bytes) return
-    return { cid, bytes }
+    return bytes
   }
 
   /**
