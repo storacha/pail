@@ -1,10 +1,9 @@
 // @ts-nocheck
 
-import { describe, it, beforeEach,assert } from 'vitest'
+import { describe, it, beforeEach, assert } from 'vitest'
 import { Fireproof } from '../src/fireproof.js'
 import { DbIndex } from '../src/db-index.js'
-import "fake-indexeddb/auto";
-
+import 'fake-indexeddb/auto'
 
 describe('DbIndex query', () => {
   let database, index
@@ -289,10 +288,50 @@ describe.only('DbIndex query with bad index definition', () => {
   it('query index range', async () => {
     const oldErrFn = console.error
     console.error = () => {}
-    await index.query({ range: [39, 44] }).catch(e => {
+    try {
+      await index.query({ range: [41, 44] })
+    } catch (e) {
       assert(/missingField/.test(e.message))
+    } finally {
       console.error = oldErrFn
-    })
+    }
+  })
+})
+
+describe('DbIndex query with concise index definition', () => {
+  let database, index
+  beforeEach(async () => {
+    database = Fireproof.storage()
+    await database.put({ _id: 'a1s3b32a-3c3a-4b5e-9c1c-8c5c0c5c0c5c', name: 'alice', age: 40 })
+    index = new DbIndex(database, null, doc => doc.age)
+  })
+  it('sets string fn', () => {
+    assert.equal(index.mapFnString, 'doc => doc.age')
+  })
+  it('has a default name', () => {
+    assert.equal(index.name, 'doc.age')
+  })
+  it('query index range', async () => {
+    const result = await index.query({ range: [39, 44] })
+    assert.equal(result.rows.length, 1)
+    assert.equal(result.rows[0].value, null)
+  })
+  it('defaults to includeDocs = true', async () => {
+    const result = await index.query({ range: [39, 44] })
+    assert.equal(result.rows[0].value, null)
+    assert(result.rows[0].doc, 'doc is included')
+    assert.equal(result.rows[0].doc.name, 'alice')
+  })
+  it('with includeDocs = false', async () => {
+    const result = await index.query({ range: [39, 44], includeDocs: false })
+    assert.equal(result.rows[0].value, null)
+    assert(!result.rows[0].doc, 'doc should not be included')
+  })
+  it('query index range descending', async () => {
+    await database.put({ _id: 'randy-1234', name: 'randy', age: 41 })
+    const result = await index.query({ range: [39, 44], descending: true })
+    assert.equal(result.rows.length, 2)
+    assert.equal(result.rows[0].key, 41)
   })
 })
 
