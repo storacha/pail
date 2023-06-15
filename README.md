@@ -5,7 +5,7 @@
 
 DAG based key value store. Sharded DAG that minimises traversals and work to build shards.
 
-* 📖 [Read the SPEC](https://hackmd.io/@alanshaw/pail).
+* 📖 [Read the SPEC](https://github.com/web3-storage/specs/blob/460b6511979a52ec9870f307695ee3f0b3860f81/kv.md).
 * 🎬 [Watch the Presentation](https://youtu.be/f-BrtpYKZfg).
 
 ## Install
