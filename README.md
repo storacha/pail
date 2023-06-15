@@ -37,10 +37,11 @@ for (const block of removals) {
   await blocks.delete(block.cid)
 }
 ```
-# Contributing
+
+## Contributing
 
 Feel free to join in. All welcome. [Open an issue](https://github.com/alanshaw/pail/issues)!
 
-# License
+## License
 
 Dual-licensed under [MIT or Apache 2.0](https://github.com/alanshaw/pail/blob/main/LICENSE.md)
