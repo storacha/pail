@@ -136,6 +136,24 @@ describe('CRDT', () => {
       assert(v.toString(), new Map(data).get(k)?.toString())
     }
   })
+
+  it('root in additions', async () => {
+    const blocks = new Blockstore()
+    const alice = new TestPail(blocks, [])
+
+    const key0 = 'key0'
+    const value0 = await randomCID(32)
+
+    const r1 = await alice.put(key0, value0)
+    const root1 = r1.root.toString()
+    const add1 = r1.additions.map(a => a.cid.toString())
+    assert(add1.indexOf(root1) !== -1)
+
+    const r2 = await alice.put(key0, value0)
+    const root2 = r2.root.toString()
+    const add2 = r2.additions.map(a => a.cid.toString())
+    assert(add2.indexOf(root2) !== -1)
+  })
 })
 
 class TestPail {

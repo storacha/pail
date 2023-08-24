@@ -96,9 +96,10 @@ export async function put (blocks, head, key, value, options) {
   mblocks.putSync(event.cid, event.bytes)
   head = await Clock.advance(blocks, head, event.cid)
 
-  // filter blocks that were added _and_ removed
+  // filter blocks that were added _and_ removed, except for the root
+  const rootCidString = result.root.toString()
   for (const k of removals.keys()) {
-    if (additions.has(k)) {
+    if (additions.has(k) && k !== rootCidString) {
       additions.delete(k)
       removals.delete(k)
     }
