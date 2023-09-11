@@ -96,6 +96,11 @@ export async function put (blocks, root, key, value, options = {}) {
     child = await encodeShardBlock(shard, target.prefix)
   }
 
+  // if no change in the target then we're done
+  if (child.cid.toString() === target.cid.toString()) {
+    return { root, additions: [], removals: [] }
+  }
+
   additions.push(child)
 
   // path is root -> shard, so work backwards, propagating the new shard CID
