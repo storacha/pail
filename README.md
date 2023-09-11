@@ -18,9 +18,10 @@ npm install @alanshaw/pail
 
 ```js
 import { ShardBlock, put, get, del } from '@alanshaw/pail'
+import { MemoryBlockstore } from '@alanshaw/pail/block'
 
 // Initialize a new bucket
-const blocks = new Blockstore() // like https://npm.im/blockstore-core
+const blocks = new MemoryBlockstore()
 const init = await ShardBlock.create() // empty root shard
 await blocks.put(init.cid, init.bytes)
 
