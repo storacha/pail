@@ -288,6 +288,9 @@ function findCommonString (arrays) {
  * @param {import('./clock').EventLink<EventData>} tail
  */
 async function findSortedEvents (events, head, tail) {
+  if (head.length === 1 && String(head[0]) === String(tail)) {
+    return []
+  }
   // get weighted events - heavier events happened first
   /** @type {Map<string, { event: import('./clock').EventBlockView<EventData>, weight: number }>} */
   const weights = new Map()
