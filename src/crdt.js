@@ -14,7 +14,7 @@ import { MemoryBlockstore, MultiBlockFetcher } from './block.js'
  * @typedef {{
  *   root: import('./shard').ShardLink
  *   head: import('./clock').EventLink<EventData>[]
- *   event: import('./clock').EventBlockView<EventData>
+ *   event?: import('./clock').EventBlockView<EventData>
  * } & import('./index').ShardDiff} Result
  */
 
@@ -50,6 +50,7 @@ export async function put (blocks, head, key, value, options) {
     }
   }
 
+  /** @type {EventFetcher<EventData>} */
   const events = new EventFetcher(blocks)
   const ancestor = await findCommonAncestor(events, head)
   if (!ancestor) throw new Error('failed to find common ancestor event')
@@ -82,6 +83,11 @@ export async function put (blocks, head, key, value, options) {
   }
 
   const result = await Pail.put(blocks, root, key, value, options)
+  // if we didn't change the pail we're done
+  if (result.root.toString() === root.toString()) {
+    return { root, additions: [], removals: [], head }
+  }
+
   for (const a of result.additions) {
     mblocks.putSync(a.cid, a.bytes)
     additions.set(a.cid.toString(), a)

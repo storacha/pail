@@ -44,6 +44,32 @@ describe('put', () => {
     assert.equal(result.additions[0].value[0][1].toString(), dataCID.toString())
   })
 
+  it('put same value to existing key', async () => {
+    const root = await ShardBlock.create()
+    const blocks = new Blockstore()
+    await blocks.put(root.cid, root.bytes)
+
+    const dataCID = await randomCID(32)
+    const result0 = await put(blocks, root.cid, 'test', dataCID)
+
+    assert.equal(result0.removals.length, 1)
+    assert.equal(result0.removals[0].cid.toString(), root.cid.toString())
+    assert.equal(result0.additions.length, 1)
+    assert.equal(result0.additions[0].value.length, 1)
+    assert.equal(result0.additions[0].value[0][0], 'test')
+    assert.equal(result0.additions[0].value[0][1].toString(), dataCID.toString())
+
+    for (const b of result0.additions) {
+      await blocks.put(b.cid, b.bytes)
+    }
+
+    const result1 = await put(blocks, result0.root, 'test', dataCID)
+
+    assert.equal(result1.removals.length, 0)
+    assert.equal(result1.additions.length, 0)
+    assert.equal(result1.root.toString(), result0.root.toString())
+  })
+
   it('auto-shards on long key', async () => {
     const root = await ShardBlock.create()
     const blocks = new Blockstore()
