@@ -4,8 +4,8 @@ import { CarWriter } from '@ipld/car'
 import { CID } from 'multiformats/cid'
 import * as raw from 'multiformats/codecs/raw'
 import { sha256 } from 'multiformats/hashes/sha2'
-import { ShardBlock, put } from '../../index.js'
-import { MemoryBlockstore } from '../../block.js'
+import { ShardBlock, put } from '../../src/index.js'
+import { MemoryBlockstore } from '../../src/block.js'
 
 /** @param {string} str */
 async function stringToCID (str) {
@@ -46,6 +46,7 @@ async function main () {
   })
 
   for (const b of blocks.entries()) {
+    // @ts-expect-error
     await writer.put(b)
   }
   await writer.close()
