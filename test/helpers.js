@@ -6,6 +6,29 @@ import { sha256 } from 'multiformats/hashes/sha2'
 import { decodeShardBlock } from '../src/index.js'
 import { MemoryBlockstore } from '../src/block.js'
 
+/**
+ * @param {number} min
+ * @param {number} max
+ */
+export function randomInteger (min, max) {
+  min = Math.ceil(min)
+  max = Math.floor(max)
+  return Math.floor(Math.random() * (max - min) + min)
+}
+
+const Alphabet = 'abcdefghijklmnopqrstuvwxyz-/_'
+
+/**
+ * @param {number} size
+ */
+export function randomString (size, alphabet = Alphabet) {
+  let str = ''
+  while (str.length < size) {
+    str += alphabet[randomInteger(0, alphabet.length)]
+  }
+  return str
+}
+
 /** @param {number} size */
 export async function randomCID (size) {
   const hash = await sha256.digest(await randomBytes(size))

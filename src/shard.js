@@ -37,6 +37,9 @@ export class ShardBlock extends Block {
   }
 }
 
+/** @type {WeakMap<Uint8Array, ShardBlockView>} */
+const decodeCache = new WeakMap()
+
 /**
  * @param {Shard} value
  * @param {string} [prefix]
@@ -44,7 +47,9 @@ export class ShardBlock extends Block {
  */
 export async function encodeShardBlock (value, prefix) {
   const { cid, bytes } = await encode({ value, codec: cbor, hasher: sha256 })
-  return new ShardBlock({ cid, value, bytes, prefix: prefix ?? '' })
+  const block = new ShardBlock({ cid, value, bytes, prefix: prefix ?? '' })
+  decodeCache.set(block.bytes, block)
+  return block
 }
 
 /**
@@ -53,6 +58,8 @@ export async function encodeShardBlock (value, prefix) {
  * @returns {Promise<ShardBlockView>}
  */
 export async function decodeShardBlock (bytes, prefix) {
+  const block = decodeCache.get(bytes)
+  if (block) return block
   const { cid, value } = await decode({ bytes, codec: cbor, hasher: sha256 })
   if (!Array.isArray(value)) throw new Error(`invalid shard: ${cid}`)
   return new ShardBlock({ cid, value, bytes, prefix: prefix ?? '' })
