@@ -135,6 +135,7 @@ async function contains (events, a, b) {
   if (a.toString() === b.toString()) return true
   const [{ value: aevent }, { value: bevent }] = await Promise.all([events.get(a), events.get(b)])
   const links = [...aevent.parents]
+  const seen = new Set()
   while (links.length) {
     const link = links.shift()
     if (!link) break
@@ -142,6 +143,8 @@ async function contains (events, a, b) {
     // if any of b's parents are this link, then b cannot exist in any of the
     // tree below, since that would create a cycle.
     if (bevent.parents.some(p => link.toString() === p.toString())) continue
+    if (seen.has(link.toString())) continue
+    seen.add(link.toString())
     const { value: event } = await events.get(link)
     links.push(...event.parents)
   }
