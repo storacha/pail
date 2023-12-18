@@ -8,8 +8,10 @@ import { CID } from 'multiformats/cid'
 import { CarIndexedReader, CarReader, CarWriter } from '@ipld/car'
 import clc from 'cli-color'
 import archy from 'archy'
-import { MaxShardSize, put, ShardBlock, get, del, entries } from './src/index.js'
-import { ShardFetcher } from './src/shard.js'
+// eslint-disable-next-line no-unused-vars
+import * as API from './src/api.js'
+import { put, get, del, entries } from './src/index.js'
+import { ShardFetcher, ShardBlock, MaxShardSize } from './src/shard.js'
 import { difference } from './src/diff.js'
 import { merge } from './src/merge.js'
 
@@ -21,11 +23,11 @@ cli.command('put <key> <value>')
   .alias('set')
   .option('--max-shard-size', 'Maximum shard size in bytes.', MaxShardSize)
   .action(async (key, value, opts) => {
-    const blocks = await openPail(opts.path)
-    const roots = await blocks.getRoots()
     const maxShardSize = opts['max-shard-size'] ?? MaxShardSize
+    const blocks = await openPail(opts.path, { maxSize: maxShardSize })
+    const roots = await blocks.getRoots()
     // @ts-expect-error
-    const { root, additions, removals } = await put(blocks, roots[0], key, CID.parse(value), { maxShardSize })
+    const { root, additions, removals } = await put(blocks, roots[0], key, CID.parse(value))
     await updatePail(opts.path, blocks, root, { additions, removals })
 
     console.log(clc.red(`--- ${roots[0]}`))
@@ -95,7 +97,7 @@ cli.command('tree')
     /** @type {archy.Data} */
     const archyRoot = { label: `Shard(${clc.yellow(rshard.cid.toString())}) ${rshard.bytes.length + 'b'}`, nodes: [] }
 
-    /** @param {import('./src/shard').ShardEntry} entry */
+    /** @param {API.ShardEntry} entry */
     const getData = async ([k, v]) => {
       if (!Array.isArray(v)) {
         return { label: `Key(${clc.magenta(k)})`, nodes: [{ label: `Value(${clc.cyan(v)})` }] }
@@ -106,12 +108,12 @@ cli.command('tree')
       const blk = await shards.get(v[0])
       data.nodes?.push({
         label: `Shard(${clc.yellow(v[0])}) ${blk.bytes.length + 'b'}`,
-        nodes: await Promise.all(blk.value.map(e => getData(e)))
+        nodes: await Promise.all(blk.value.entries.map(e => getData(e)))
       })
       return data
     }
 
-    for (const entry of rshard.value) {
+    for (const entry of rshard.value.entries) {
       archyRoot.nodes?.push(await getData(entry))
     }
 
@@ -125,7 +127,7 @@ cli.command('diff <path>')
   .action(async (path, opts) => {
     const [ablocks, bblocks] = await Promise.all([openPail(opts.path), openPail(path)])
     const [aroot, broot] = await Promise.all([ablocks, bblocks].map(async blocks => {
-      return /** @type {import('./src/shard').ShardLink} */((await blocks.getRoots())[0])
+      return /** @type {API.ShardLink} */((await blocks.getRoots())[0])
     }))
     if (aroot.toString() === broot.toString()) return
 
@@ -136,6 +138,7 @@ cli.command('diff <path>')
         return bblocks.get(cid)
       }
     }
+    // @ts-expect-error CarReader is not BlockFetcher
     const { shards: { additions, removals }, keys } = await difference(fetcher, aroot, broot)
 
     console.log(clc.red(`--- ${aroot}`))
@@ -160,7 +163,7 @@ cli.command('merge <path>')
   .action(async (path, opts) => {
     const [ablocks, bblocks] = await Promise.all([openPail(opts.path), openPail(path)])
     const [aroot, broot] = await Promise.all([ablocks, bblocks].map(async blocks => {
-      return /** @type {import('./src/shard').ShardLink} */((await blocks.getRoots())[0])
+      return /** @type {API.ShardLink} */((await blocks.getRoots())[0])
     }))
     if (aroot.toString() === broot.toString()) return
 
@@ -171,6 +174,7 @@ cli.command('merge <path>')
         return bblocks.get(cid)
       }
     }
+    // @ts-expect-error CarReader is not BlockFetcher
     const { root, additions, removals } = await merge(fetcher, aroot, [broot])
 
     await updatePail(opts.path, ablocks, root, { additions, removals })
@@ -188,17 +192,16 @@ cli.parse(process.argv)
 
 /**
  * @param {string} path
+ * @param {{ maxSize?: number }} [config]
  * @returns {Promise<import('@ipld/car/api').CarReader>}
  */
-async function openPail (path) {
+async function openPail (path, config) {
   try {
     return await CarIndexedReader.fromFile(path)
   } catch (err) {
     if (err.code !== 'ENOENT') throw new Error('failed to open bucket', { cause: err })
-    const rootblk = await ShardBlock.create()
-    // @ts-expect-error
+    const rootblk = await ShardBlock.create(config)
     const { writer, out } = CarWriter.create(rootblk.cid)
-    // @ts-expect-error
     writer.put(rootblk)
     writer.close()
     return CarReader.fromIterable(out)
@@ -215,8 +218,8 @@ async function closePail (reader) {
 /**
  * @param {string} path
  * @param {import('@ipld/car/api').CarReader} reader
- * @param {import('./src/shard').ShardLink} root
- * @param {import('./src/index').ShardDiff} diff
+ * @param {API.ShardLink} root
+ * @param {API.ShardDiff} diff
  */
 async function updatePail (path, reader, root, { additions, removals }) {
   // @ts-expect-error
@@ -229,7 +232,6 @@ async function updatePail (path, reader, root, { additions, removals }) {
 
   // put new blocks
   for (const b of additions) {
-    // @ts-expect-error
     await writer.put(b)
   }
   // put old blocks without removals

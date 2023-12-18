@@ -1,5 +1,7 @@
 import { describe, it } from 'mocha'
 import assert from 'node:assert'
+// eslint-disable-next-line no-unused-vars
+import * as API from '../src/api.js'
 import { advance, vis } from '../src/clock.js'
 import { put, get, root, entries } from '../src/crdt.js'
 import { Blockstore, randomCID } from './helpers.js'
@@ -46,7 +48,7 @@ describe('CRDT', () => {
     await alice.put('apple', await randomCID(32))
     const bob = new TestPail(blocks, alice.head)
 
-    /** @type {Array<[string, import('../src/link').AnyLink]>} */
+    /** @type {Array<[string, API.UnknownLink]>} */
     const data = [
       ['banana', await randomCID(32)],
       ['kiwi', await randomCID(32)],
@@ -109,7 +111,7 @@ describe('CRDT', () => {
     await alice.put('apple', await randomCID(32))
     const bob = new TestPail(blocks, alice.head)
 
-    /** @type {Array<[string, import('../src/link').AnyLink]>} */
+    /** @type {Array<[string, API.UnknownLink]>} */
     const data = [
       ['banana', await randomCID(32)],
       ['kiwi', await randomCID(32)]
@@ -133,7 +135,7 @@ describe('CRDT', () => {
     await alice.put('apple', await randomCID(32))
     const bob = new TestPail(blocks, alice.head)
 
-    /** @type {Array<[string, import('../src/link').AnyLink]>} */
+    /** @type {Array<[string, API.UnknownLink]>} */
     const data = [
       ['banana', await randomCID(32)],
       ['kiwi', await randomCID(32)]
@@ -178,16 +180,16 @@ describe('CRDT', () => {
 class TestPail {
   /**
    * @param {Blockstore} blocks
-   * @param {import('../src/clock').EventLink<import('../src/crdt').EventData>[]} head
+   * @param {API.EventLink<API.EventData>[]} head
    */
   constructor (blocks, head) {
     this.blocks = blocks
     this.head = head
-    /** @type {import('../src/shard.js').ShardLink?} */
+    /** @type {API.ShardLink?} */
     this.root = null
   }
 
-  /** @param {import('../src/clock').EventLink<import('../src/crdt').EventData>} event */
+  /** @param {API.EventLink<API.EventData>} event */
   async advance (event) {
     this.head = await advance(this.blocks, this.head, event)
     const result = await root(this.blocks, this.head)
@@ -198,7 +200,7 @@ class TestPail {
 
   /**
    * @param {string} key
-   * @param {import('../src/link').AnyLink} value
+   * @param {API.UnknownLink} value
    */
   async put (key, value) {
     const result = await put(this.blocks, this.head, key, value)
@@ -211,13 +213,13 @@ class TestPail {
 
   /**
    * @param {string} key
-   * @param {import('../src/link').AnyLink} value
+   * @param {API.UnknownLink} value
    */
   async putAndVis (key, value) {
     const result = await this.put(key, value)
-    /** @param {import('../src/link').AnyLink} l */
+    /** @param {API.UnknownLink} l */
     const shortLink = l => `${String(l).slice(0, 4)}..${String(l).slice(-4)}`
-    /** @type {(e: import('../src/clock').EventBlockView<import('../src/crdt').EventData>) => string} */
+    /** @type {(e: API.EventBlockView<API.EventData>) => string} */
     const renderNodeLabel = event => {
       return event.value.data.type === 'put'
         ? `${shortLink(event.cid)}\\nput(${event.value.data.key}, ${shortLink(event.value.data.value)})`

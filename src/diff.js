@@ -1,19 +1,21 @@
+// eslint-disable-next-line no-unused-vars
+import * as API from './api.js'
 import { ShardFetcher } from './shard.js'
 
 /**
  * @typedef {string} K
- * @typedef {[before: null, after: import('./link').AnyLink]} AddV
- * @typedef {[before: import('./link').AnyLink, after: import('./link').AnyLink]} UpdateV
- * @typedef {[before: import('./link').AnyLink, after: null]} DeleteV
+ * @typedef {[before: null, after: API.UnknownLink]} AddV
+ * @typedef {[before: API.UnknownLink, after: API.UnknownLink]} UpdateV
+ * @typedef {[before: API.UnknownLink, after: null]} DeleteV
  * @typedef {[key: K, value: AddV|UpdateV|DeleteV]} KV
  * @typedef {KV[]} KeysDiff
- * @typedef {{ keys: KeysDiff, shards: import('./index').ShardDiff }} CombinedDiff
+ * @typedef {{ keys: KeysDiff, shards: API.ShardDiff }} CombinedDiff
  */
 
 /**
- * @param {import('./block').BlockFetcher} blocks Bucket block storage.
- * @param {import('./shard').ShardLink} a Base DAG.
- * @param {import('./shard').ShardLink} b Comparison DAG.
+ * @param {API.BlockFetcher} blocks Bucket block storage.
+ * @param {API.ShardLink} a Base DAG.
+ * @param {API.ShardLink} b Comparison DAG.
  * @returns {Promise<CombinedDiff>}
  */
 export async function difference (blocks, a, b, prefix = '') {
@@ -22,15 +24,15 @@ export async function difference (blocks, a, b, prefix = '') {
   const shards = new ShardFetcher(blocks)
   const [ashard, bshard] = await Promise.all([shards.get(a, prefix), shards.get(b, prefix)])
 
-  const aents = new Map(ashard.value)
-  const bents = new Map(bshard.value)
+  const aents = new Map(ashard.value.entries)
+  const bents = new Map(bshard.value.entries)
 
   const keys = /** @type {Map<K, AddV|UpdateV|DeleteV>} */(new Map())
   const additions = new Map([[bshard.cid.toString(), bshard]])
   const removals = new Map([[ashard.cid.toString(), ashard]])
 
   // find shards removed in B
-  for (const [akey, aval] of ashard.value) {
+  for (const [akey, aval] of ashard.value.entries) {
     const bval = bents.get(akey)
     if (bval) continue
     if (!Array.isArray(aval)) {
@@ -42,7 +44,7 @@ export async function difference (blocks, a, b, prefix = '') {
       keys.set(`${ashard.prefix}${akey}`, [aval[1], null])
     }
     for await (const s of collect(shards, aval[0], `${ashard.prefix}${akey}`)) {
-      for (const [k, v] of s.value) {
+      for (const [k, v] of s.value.entries) {
         if (!Array.isArray(v)) {
           keys.set(`${s.prefix}${k}`, [v, null])
         } else if (v[1] != null) {
@@ -54,7 +56,7 @@ export async function difference (blocks, a, b, prefix = '') {
   }
 
   // find shards added or updated in B
-  for (const [bkey, bval] of bshard.value) {
+  for (const [bkey, bval] of bshard.value.entries) {
     const aval = aents.get(bkey)
     if (!Array.isArray(bval)) {
       if (!aval) {
@@ -90,7 +92,7 @@ export async function difference (blocks, a, b, prefix = '') {
         keys.set(`${bshard.prefix}${bkey}`, [aval, bval[1]])
       }
       for await (const s of collect(shards, bval[0], `${bshard.prefix}${bkey}`)) {
-        for (const [k, v] of s.value) {
+        for (const [k, v] of s.value.entries) {
           if (!Array.isArray(v)) {
             keys.set(`${s.prefix}${k}`, [null, v])
           } else if (v[1] != null) {
@@ -102,7 +104,7 @@ export async function difference (blocks, a, b, prefix = '') {
     } else { // added in B
       keys.set(`${bshard.prefix}${bkey}`, [null, bval[0]])
       for await (const s of collect(shards, bval[0], `${bshard.prefix}${bkey}`)) {
-        for (const [k, v] of s.value) {
+        for (const [k, v] of s.value.entries) {
           if (!Array.isArray(v)) {
             keys.set(`${s.prefix}${k}`, [null, v])
           } else if (v[1] != null) {
@@ -129,20 +131,20 @@ export async function difference (blocks, a, b, prefix = '') {
 }
 
 /**
- * @param {import('./link').AnyLink} a
- * @param {import('./link').AnyLink} b
+ * @param {API.UnknownLink} a
+ * @param {API.UnknownLink} b
  */
 const isEqual = (a, b) => a.toString() === b.toString()
 
 /**
- * @param {import('./shard').ShardFetcher} shards
- * @param {import('./shard').ShardLink} root
- * @returns {AsyncIterableIterator<import('./shard').ShardBlockView>}
+ * @param {import('./shard.js').ShardFetcher} shards
+ * @param {API.ShardLink} root
+ * @returns {AsyncIterableIterator<API.ShardBlockView>}
  */
 async function * collect (shards, root, prefix = '') {
   const shard = await shards.get(root, prefix)
   yield shard
-  for (const [k, v] of shard.value) {
+  for (const [k, v] of shard.value.entries) {
     if (!Array.isArray(v)) continue
     yield * collect(shards, v[0], `${prefix}${k}`)
   }

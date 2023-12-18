@@ -1,4 +1,7 @@
-import { ShardBlock, put } from '../src/index.js'
+// eslint-disable-next-line no-unused-vars
+import * as API from '../src/api.js'
+import { put } from '../src/index.js'
+import { ShardBlock } from '../src/shard.js'
 import { MemoryBlockstore } from '../src/block.js'
 import { randomCID, randomString, randomInteger } from '../test/helpers.js'
 
@@ -11,7 +14,7 @@ async function main () {
   const blocks = new MemoryBlockstore()
   await blocks.put(rootBlock.cid, rootBlock.bytes)
 
-  /** @type {Array<[string, import('multiformats').UnknownLink]>} */
+  /** @type {Array<[string, API.UnknownLink]>} */
   const kvs = []
 
   for (let i = 0; i < NUM; i++) {
@@ -22,7 +25,7 @@ async function main () {
 
   console.log('bench')
   console.time(`put x${NUM}`)
-  /** @type {import('../src/shard.js').ShardLink} */
+  /** @type {API.ShardLink} */
   let root = rootBlock.cid
   for (let i = 0; i < kvs.length; i++) {
     const result = await put(blocks, root, kvs[i][0], kvs[i][1])

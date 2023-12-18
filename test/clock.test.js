@@ -1,5 +1,7 @@
 import { describe, it } from 'mocha'
 import assert from 'node:assert'
+// eslint-disable-next-line no-unused-vars
+import * as API from '../src/api.js'
 import { advance, EventBlock, vis } from '../src/clock.js'
 import { Blockstore, randomCID } from './helpers.js'
 
@@ -29,7 +31,7 @@ describe('clock', () => {
     const root = await EventBlock.create(await randomEventData())
     await blocks.put(root.cid, root.bytes)
 
-    /** @type {import('../src/clock').EventLink<any>[]} */
+    /** @type {API.EventLink<any>[]} */
     let head = [root.cid]
 
     const event = await EventBlock.create(await randomEventData(), head)
@@ -47,7 +49,7 @@ describe('clock', () => {
     const root = await EventBlock.create(await randomEventData())
     await blocks.put(root.cid, root.bytes)
 
-    /** @type {import('../src/clock').EventLink<any>[]} */
+    /** @type {API.EventLink<any>[]} */
     let head = [root.cid]
     const parents = head
 
@@ -70,7 +72,7 @@ describe('clock', () => {
     const root = await EventBlock.create(await randomEventData())
     await blocks.put(root.cid, root.bytes)
 
-    /** @type {import('../src/clock').EventLink<any>[]} */
+    /** @type {API.EventLink<any>[]} */
     let head = [root.cid]
     const parents0 = head
 
@@ -105,7 +107,7 @@ describe('clock', () => {
     const root = await EventBlock.create(await randomEventData())
     await blocks.put(root.cid, root.bytes)
 
-    /** @type {import('../src/clock').EventLink<any>[]} */
+    /** @type {API.EventLink<any>[]} */
     let head = [root.cid]
     const parents0 = head
 
@@ -147,7 +149,7 @@ describe('clock', () => {
     const root = await EventBlock.create(await randomEventData())
     await blocks.put(root.cid, root.bytes)
 
-    /** @type {import('../src/clock').EventLink<any>[]} */
+    /** @type {API.EventLink<any>[]} */
     let head = [root.cid]
     const parents0 = head
 
@@ -195,7 +197,7 @@ describe('clock', () => {
     const root = await EventBlock.create(await randomEventData())
     await blocks.put(root.cid, root.bytes)
 
-    /** @type {import('../src/clock').EventLink<any>[]} */
+    /** @type {API.EventLink<any>[]} */
     let head = [root.cid]
 
     const event0 = await EventBlock.create(await randomEventData(), head)

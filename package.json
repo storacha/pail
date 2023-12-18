@@ -13,6 +13,9 @@
       "dist/src/index.d.ts": [
         "dist/src/index.d.ts"
       ],
+      "api": [
+        "dist/src/api.d.ts"
+      ],
       "block": [
         "dist/src/block.d.ts"
       ],
@@ -40,6 +43,10 @@
     ".": {
       "types": "./dist/src/index.d.ts",
       "import": "./src/index.js"
+    },
+    "./api": {
+      "types": "./dist/src/api.d.ts",
+      "import": "./src/api.js"
     },
     "./block": {
       "types": "./dist/src/block.d.ts",
