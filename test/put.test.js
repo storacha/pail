@@ -22,9 +22,17 @@ async function fillShard (shard, mkentry) {
   let i = 0
   while (true) {
     const entry = await mkentry(i)
-    const blk = await Shard.encodeBlock(Shard.putEntry(shard, entry))
+    const blk = await Shard.encodeBlock(
+      Shard.withEntries(
+        Shard.putEntry(shard.entries, entry),
+        shard
+      )
+    )
     if (blk.bytes.length > shard.maxSize) return { shard, entry }
-    shard = Shard.putEntry(shard, entry)
+    shard = Shard.withEntries(
+      Shard.putEntry(shard.entries, entry),
+      shard
+    )
     i++
   }
 }

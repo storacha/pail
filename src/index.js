@@ -54,12 +54,11 @@ export const put = async (blocks, root, key, value) => {
     entry = [pfxskeys[0].skey, [child.cid]]
   }
 
-  /** @type {API.Shard} */
-  let shard = Shard.putEntry(target.value, entry)
+  let shard = Shard.withEntries(Shard.putEntry(target.value.entries, entry), target.value)
   let child = await Shard.encodeBlock(shard, target.prefix)
 
   if (child.bytes.length > shard.maxSize) {
-    const common = Shard.findCommonPrefix(shard, entry[0])
+    const common = Shard.findCommonPrefix(shard.entries, entry[0])
     if (!common) throw new Error('shard limit reached')
     const { prefix, matches } = common
     const block = await Shard.encodeBlock(
@@ -88,7 +87,7 @@ export const put = async (blocks, root, key, value) => {
     }
 
     shard.entries = shard.entries.filter(e => matches.every(m => e[0] !== m[0]))
-    shard = Shard.putEntry(shard, [prefix, value])
+    shard = Shard.withEntries(Shard.putEntry(shard.entries, [prefix, value]), shard)
     child = await Shard.encodeBlock(shard, target.prefix)
   }
 

@@ -25,28 +25,33 @@ export class ShardBlock extends Block {
     this.prefix = prefix
   }
 
-  /** @param {{ maxSize?: number, maxKeyLength?: number }} [config] */
-  static create (config) {
-    return encodeBlock(create(config))
+  /** @param {API.ShardOptions} [options] */
+  static create (options) {
+    return encodeBlock(create(options))
   }
 }
 
 /**
- * @param {{ maxSize?: number, maxKeyLength?: number }} [config]
+ * @param {API.ShardOptions} [options]
  * @returns {API.Shard}
  */
-export const create = (config) => ({
-  entries: [],
-  maxSize: config?.maxSize ?? MaxShardSize,
-  maxKeyLength: config?.maxKeyLength ?? MaxKeyLength
+export const create = (options) => ({ entries: [], ...configure(options) })
+
+/**
+ * @param {API.ShardOptions} [options]
+ * @returns {API.ShardConfig}
+ */
+export const configure = (options) => ({
+  maxSize: options?.maxSize ?? MaxShardSize,
+  maxKeyLength: options?.maxKeyLength ?? MaxKeyLength
 })
 
 /**
  * @param {API.ShardEntry[]} entries
- * @param {{ maxSize?: number, maxKeyLength?: number }} [config]
+ * @param {API.ShardOptions} [options]
  * @returns {API.Shard}
  */
-export const withEntries = (entries, config) => ({ ...create(config), entries })
+export const withEntries = (entries, options) => ({ ...create(options), entries })
 
 /** @type {WeakMap<Uint8Array, API.ShardBlockView>} */
 const decodeCache = new WeakMap()
@@ -106,81 +111,91 @@ export class ShardFetcher {
 }
 
 /**
- * @param {API.Shard} target Shard to put to.
- * @param {API.ShardEntry} entry
- * @returns {API.Shard}
+ * @param {API.ShardEntry[]} target Entries to insert into.
+ * @param {API.ShardEntry} newEntry
+ * @returns {API.ShardEntry[]}
  */
-export const putEntry = (target, entry) => {
-  /** @type {API.Shard} */
-  const shard = create(target)
+export const putEntry = (target, newEntry) => {
+  /** @type {API.ShardEntry[]} */
+  const entries = []
 
-  for (const [i, [k, v]] of target.entries.entries()) {
-    if (entry[0] === k) {
+  for (let [i, entry] of target.entries()) {
+    const [k, v] = entry
+    if (newEntry[0] === k) {
       // if new value is link to shard...
-      if (Array.isArray(entry[1])) {
+      if (Array.isArray(newEntry[1])) {
         // and old value is link to shard
         // and old value is _also_ link to data
         // and new value does not have link to data
         // then preserve old data
-        if (Array.isArray(v) && v[1] != null && entry[1][1] == null) {
-          shard.entries.push([k, [entry[1][0], v[1]]])
+        if (Array.isArray(v) && v[1] != null && newEntry[1][1] == null) {          
+          entries.push(Object.assign([], entry, newEntry, { 1: [newEntry[1][0], v[1]] }))
         } else {
-          shard.entries.push(entry)
+          entries.push(newEntry)
         }
       } else {
         // shard as well as value?
-        /** @type {API.ShardEntry} */
-        const newEntry = Array.isArray(v) ? [k, [v[0], entry[1]]] : entry
-        shard.entries.push(newEntry)
+        if (Array.isArray(v)) {
+          entries.push(Object.assign([], entry, newEntry, { 1: [v[0], newEntry[1]] }))
+        } else {
+          entries.push(newEntry)
+        }
       }
-      for (let j = i + 1; j < target.entries.length; j++) {
-        shard.entries.push(target.entries[j])
+      for (let j = i + 1; j < target.length; j++) {
+        entries.push(target[j])
       }
-      return shard
+      return entries
     }
-    if (i === 0 && entry[0] < k) {
-      shard.entries.push(entry)
-      for (let j = i; j < target.entries.length; j++) {
-        shard.entries.push(target.entries[j])
+    if (i === 0 && newEntry[0] < k) {
+      entries.push(newEntry)
+      for (let j = i; j < target.length; j++) {
+        entries.push(target[j])
       }
-      return shard
+      return entries
     }
-    if (i > 0 && entry[0] > target.entries[i - 1][0] && entry[0] < k) {
-      shard.entries.push(entry)
-      for (let j = i; j < target.entries.length; j++) {
-        shard.entries.push(target.entries[j])
+    if (i > 0 && newEntry[0] > target[i - 1][0] && newEntry[0] < k) {
+      entries.push(newEntry)
+      for (let j = i; j < target.length; j++) {
+        entries.push(target[j])
       }
-      return shard
+      return entries
     }
-    shard.entries.push([k, v])
+    entries.push(entry)
   }
 
-  shard.entries.push(entry)
-  return shard
+  entries.push(newEntry)
+  return entries
 }
 
 /**
- * @param {API.Shard} shard
+ * @param {API.ShardEntry[]} entries
  * @param {string} skey Shard key to use as a base.
  */
-export const findCommonPrefix = (shard, skey) => {
-  const startidx = shard.entries.findIndex(([k]) => skey === k)
+export const findCommonPrefix = (entries, skey) => {
+  const startidx = entries.findIndex(([k]) => skey === k)
   if (startidx === -1) throw new Error(`key not found in shard: ${skey}`)
   let i = startidx
   /** @type {string} */
   let pfx
   while (true) {
-    pfx = shard.entries[i][0].slice(0, -1)
+    pfx = entries[i][0].slice(0, -1)
     if (pfx.length) {
       while (true) {
-        const matches = shard.entries.filter(entry => entry[0].startsWith(pfx))
+        const matches = []
+        for (let j = i - 1; j >= 0; j--) {
+          if (entries[j][0].startsWith(pfx)) {
+            matches.push(entries[j])
+          } else {
+            break
+          }
+        }
         if (matches.length > 1) return { prefix: pfx, matches }
         pfx = pfx.slice(0, -1)
         if (!pfx.length) break
       }
     }
     i++
-    if (i >= shard.entries.length) {
+    if (i >= entries.length) {
       i = 0
     }
     if (i === startidx) {

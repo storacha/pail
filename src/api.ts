@@ -17,9 +17,6 @@ export type ShardLinkEntry = [key: string, value: ShardEntryLinkValue | ShardEnt
 /** Single key/value entry within a shard. */
 export type ShardEntry = [key: string, value: ShardEntryValueValue | ShardEntryLinkValue | ShardEntryLinkAndValueValue]
 
-/** Legacy shards are not self describing. */
-export type LegacyShard = ShardEntry[]
-
 export interface Shard {
   entries: ShardEntry[]
   /** Max key length (in UTF-8 encoded characters) - default 64. */
@@ -42,6 +39,19 @@ export interface ShardDiff {
 export interface BlockFetcher {
   get<T = unknown, C extends number = number, A extends number = number, V extends Version = 1> (link: Link<T, C, A, V>):
     Promise<Block<T, C, A, V> | undefined>
+}
+
+export interface ShardConfig {
+  maxSize: number
+  maxKeyLength: number
+}
+
+export type ShardOptions = Partial<ShardConfig>
+
+export interface ShardBuilder {
+  put (key: string, value: UnknownLink): Promise<void>
+  // del (key: string): Promise<void>
+  build (): Promise<{ root: ShardLink } & ShardDiff>
 }
 
 // Clock //////////////////////////////////////////////////////////////////////
