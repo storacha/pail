@@ -1,6 +1,4 @@
 import * as Link from 'multiformats/link'
-import { tokensToLength } from 'cborg/length'
-import { Token, Type } from 'cborg'
 // eslint-disable-next-line no-unused-vars
 import * as API from './api.js'
 import { ShardFetcher } from './shard.js'
@@ -14,7 +12,6 @@ import * as Shard from './shard.js'
  * ]} ShardBuilderEntry
  */
 
-const CID_TAG = new Token(Type.tag, 42)
 const placeholder = /** @type {API.ShardLink} */ (Link.parse('bafkqaaa'))
 
 /** @implements {API.ShardBuilder} */
@@ -22,17 +19,17 @@ class ShardBuilder {
   /**
    * @param {object} arg
    * @param {ShardFetcher} arg.shards Shard storage.
-   * @param {ShardBuilderEntry[]} arg.entries
-   * @param {number} arg.size
-   * @param {string} arg.prefix
-   * @param {API.ShardConfig} arg.config
+   * @param {ShardBuilderEntry[]} arg.entries The entries in this shard.
+   * @param {string} arg.prefix Key prefix.
+   * @param {API.ShardConfig} arg.config Shard config.
+   * @param {API.ShardBlockView} [arg.base] Original shard this builder is based on.
    */
-  constructor ({ shards, entries, size, prefix, config }) {
+  constructor ({ shards, entries, prefix, config, base }) {
     this.shards = shards
     this.prefix = prefix
-    this.size = size
     this.entries = entries
     this.config = config
+    this.base = base
   }
 
   /**
@@ -66,7 +63,6 @@ class ShardBuilder {
       builder = new ShardBuilder({
         shards: this.shards,
         entries: [entry],
-        size: calculateEncodeLength(asShardEntries([entry]), this.config),
         prefix: pfxskeys[pfxskeys.length - 1].prefix,
         config: this.config
       })
@@ -76,7 +72,6 @@ class ShardBuilder {
         builder = new ShardBuilder({
           shards: this.shards,
           entries: [entry],
-          size: calculateEncodeLength(asShardEntries([entry]), this.config),
           prefix: pfxskeys[pfxskeys.length - 1].prefix,
           config: this.config
         })
@@ -88,7 +83,7 @@ class ShardBuilder {
     this.entries = Shard.putEntry(asShardEntries(this.entries), asShardEntry(entry))
 
     // TODO: adjust size automatically
-    const size = calculateEncodeLength(asShardEntries(this.entries), this.config)
+    const size = Shard.encodedLength(Shard.withEntries(asShardEntries(this.entries), this.config))
     if (size > this.config.maxSize) {
       const common = Shard.findCommonPrefix(
         asShardEntries(this.entries),
@@ -109,7 +104,6 @@ class ShardBuilder {
 
       const builder = new ShardBuilder({
         shards: this.shards,
-        size: calculateEncodeLength(asShardEntries(entries), this.config),
         entries,
         config: this.config,
         prefix: this.prefix + prefix
@@ -187,6 +181,8 @@ class ShardBuilder {
     const block = await Shard.encodeBlock(Shard.withEntries(entries, this.config))
     additions.push(block)
 
+    if (this.base) removals.push(this.base)
+
     return { root: block.cid, additions, removals }
   }
 
@@ -196,13 +192,13 @@ class ShardBuilder {
    * @param {string} prefix
    */
   static async create (shards, link, prefix) {
-    const data = await shards.get(link)
+    const base = await shards.get(link)
     return new ShardBuilder({
       shards,
-      entries: asShardBuilderEntries(data.value.entries),
-      size: data.bytes.length,
+      entries: asShardBuilderEntries(base.value.entries),
       prefix,
-      config: Shard.configure(data.value)
+      config: Shard.configure(base.value),
+      base
     })
   }
 }
@@ -224,44 +220,4 @@ const asShardBuilderEntries = entries => /** @type {ShardBuilderEntry[]} */ (ent
 export const create = (blocks, link) => {
   const shards = new ShardFetcher(blocks)
   return ShardBuilder.create(shards, link, '')
-}
-
-/**
- * @param {API.ShardEntry[]} entries
- * @param {API.ShardConfig} config
- */
-const calculateEncodeLength = (entries, config) => {
-  let entriesLength = 0
-  for (const entry of entries) {
-    entriesLength += calculateEntryEncodeLength(entry)
-  }
-  const tokens = [
-    new Token(Type.map, 3),
-    new Token(Type.string, 'entries'),
-    new Token(Type.array, entries.length),
-    new Token(Type.string, 'maxKeyLength'),
-    new Token(Type.uint, config.maxKeyLength),
-    new Token(Type.string, 'maxSize'),
-    new Token(Type.uint, config.maxSize)
-  ]
-  return tokensToLength(tokens) + entriesLength
-}
-
-/** @param {API.ShardEntry} entry */
-const calculateEntryEncodeLength = entry => {
-  const tokens = [
-    new Token(Type.array, entry.length),
-    new Token(Type.string, entry[0])
-  ]
-  if (Array.isArray(entry[1])) {
-    tokens.push(new Token(Type.array, entry[1].length))
-    for (const link of entry[1]) {
-      tokens.push(CID_TAG)
-      tokens.push(new Token(Type.bytes, { length: link.byteLength + 1 }))
-    }
-  } else {
-    tokens.push(CID_TAG)
-    tokens.push(new Token(Type.bytes, { length: entry[1].byteLength + 1 }))
-  }
-  return tokensToLength(tokens)
 }

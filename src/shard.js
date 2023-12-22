@@ -1,11 +1,15 @@
 import { Block, encode, decode } from 'multiformats/block'
 import { sha256 } from 'multiformats/hashes/sha2'
 import * as cbor from '@ipld/dag-cbor'
+import { tokensToLength } from 'cborg/length'
+import { Token, Type } from 'cborg'
 // eslint-disable-next-line no-unused-vars
 import * as API from './api.js'
 
 export const MaxKeyLength = 64
 export const MaxShardSize = 512 * 1024
+
+const CID_TAG = new Token(Type.tag, 42)
 
 /**
  * @extends {Block<API.Shard, typeof cbor.code, typeof sha256.code, 1>}
@@ -119,7 +123,7 @@ export const putEntry = (target, newEntry) => {
   /** @type {API.ShardEntry[]} */
   const entries = []
 
-  for (let [i, entry] of target.entries()) {
+  for (const [i, entry] of target.entries()) {
     const [k, v] = entry
     if (newEntry[0] === k) {
       // if new value is link to shard...
@@ -128,7 +132,7 @@ export const putEntry = (target, newEntry) => {
         // and old value is _also_ link to data
         // and new value does not have link to data
         // then preserve old data
-        if (Array.isArray(v) && v[1] != null && newEntry[1][1] == null) {          
+        if (Array.isArray(v) && v[1] != null && newEntry[1][1] == null) {
           entries.push(Object.assign([], entry, newEntry, { 1: [newEntry[1][0], v[1]] }))
         } else {
           entries.push(newEntry)
@@ -181,14 +185,7 @@ export const findCommonPrefix = (entries, skey) => {
     pfx = entries[i][0].slice(0, -1)
     if (pfx.length) {
       while (true) {
-        const matches = []
-        for (let j = i - 1; j >= 0; j--) {
-          if (entries[j][0].startsWith(pfx)) {
-            matches.push(entries[j])
-          } else {
-            break
-          }
-        }
+        const matches = entries.filter(entry => entry[0].startsWith(pfx))
         if (matches.length > 1) return { prefix: pfx, matches }
         pfx = pfx.slice(0, -1)
         if (!pfx.length) break
@@ -202,4 +199,41 @@ export const findCommonPrefix = (entries, skey) => {
       return
     }
   }
+}
+
+/** @param {API.Shard} shard */
+export const encodedLength = (shard) => {
+  let entriesLength = 0
+  for (const entry of shard.entries) {
+    entriesLength += entryEncodedLength(entry)
+  }
+  const tokens = [
+    new Token(Type.map, 3),
+    new Token(Type.string, 'entries'),
+    new Token(Type.array, shard.entries.length),
+    new Token(Type.string, 'maxKeyLength'),
+    new Token(Type.uint, shard.maxKeyLength),
+    new Token(Type.string, 'maxSize'),
+    new Token(Type.uint, shard.maxSize)
+  ]
+  return tokensToLength(tokens) + entriesLength
+}
+
+/** @param {API.ShardEntry} entry */
+const entryEncodedLength = entry => {
+  const tokens = [
+    new Token(Type.array, entry.length),
+    new Token(Type.string, entry[0])
+  ]
+  if (Array.isArray(entry[1])) {
+    tokens.push(new Token(Type.array, entry[1].length))
+    for (const link of entry[1]) {
+      tokens.push(CID_TAG)
+      tokens.push(new Token(Type.bytes, { length: link.byteLength + 1 }))
+    }
+  } else {
+    tokens.push(CID_TAG)
+    tokens.push(new Token(Type.bytes, { length: entry[1].byteLength + 1 }))
+  }
+  return tokensToLength(tokens)
 }
