@@ -48,10 +48,10 @@ export interface ShardConfig {
 
 export type ShardOptions = Partial<ShardConfig>
 
-export interface ShardBuilder {
+export interface Batcher {
   put (key: string, value: UnknownLink): Promise<void>
   // del (key: string): Promise<void>
-  build (): Promise<{ root: ShardLink } & ShardDiff>
+  commit (): Promise<{ root: ShardLink } & ShardDiff>
 }
 
 // Clock //////////////////////////////////////////////////////////////////////
