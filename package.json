@@ -16,6 +16,9 @@
       "api": [
         "dist/src/api.d.ts"
       ],
+      "batch": [
+        "dist/src/batch.d.ts"
+      ],
       "block": [
         "dist/src/block.d.ts"
       ],
@@ -47,6 +50,10 @@
     "./api": {
       "types": "./dist/src/api.d.ts",
       "import": "./src/api.js"
+    },
+    "./batch": {
+      "types": "./dist/src/batch.d.ts",
+      "import": "./src/batch.js"
     },
     "./block": {
       "types": "./dist/src/block.d.ts",
