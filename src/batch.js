@@ -8,18 +8,18 @@ import * as Shard from './shard.js'
  * @typedef {[
  *   key: string,
  *   value: API.ShardEntryValueValue | API.ShardEntryLinkValue | API.ShardEntryLinkAndValueValue,
- *   builder?: ShardBuilder
- * ]} ShardBuilderEntry
+ *   batcher?: Batcher
+ * ]} BatcherShardEntry
  */
 
 const placeholder = /** @type {API.ShardLink} */ (Link.parse('bafkqaaa'))
 
-/** @implements {API.ShardBuilder} */
-class ShardBuilder {
+/** @implements {API.Batcher} */
+class Batcher {
   /**
    * @param {object} arg
    * @param {ShardFetcher} arg.shards Shard storage.
-   * @param {ShardBuilderEntry[]} arg.entries The entries in this shard.
+   * @param {BatcherShardEntry[]} arg.entries The entries in this shard.
    * @param {string} arg.prefix Key prefix.
    * @param {API.ShardConfig} arg.config Shard config.
    * @param {API.ShardBlockView} [arg.base] Original shard this builder is based on.
@@ -43,9 +43,9 @@ class ShardBuilder {
       return dest.builder.put(dest.key, value)
     }
 
-    /** @type {ShardBuilderEntry} */
+    /** @type {BatcherShardEntry} */
     let entry = [dest.key, value]
-    /** @type {ShardBuilder|undefined} */
+    /** @type {Batcher|undefined} */
     let builder
 
     // if the key in this shard is longer than allowed, then we need to make some
@@ -60,7 +60,7 @@ class ShardBuilder {
       })
 
       entry = [pfxskeys[pfxskeys.length - 1].key, value]
-      builder = new ShardBuilder({
+      builder = new Batcher({
         shards: this.shards,
         entries: [entry],
         prefix: pfxskeys[pfxskeys.length - 1].prefix,
@@ -69,7 +69,7 @@ class ShardBuilder {
 
       for (let i = pfxskeys.length - 2; i > 0; i--) {
         entry = [pfxskeys[i].key, [placeholder], builder]
-        builder = new ShardBuilder({
+        builder = new Batcher({
           shards: this.shards,
           entries: [entry],
           prefix: pfxskeys[pfxskeys.length - 1].prefix,
@@ -93,7 +93,7 @@ class ShardBuilder {
       const { prefix } = common
       const matches = asShardBuilderEntries(common.matches)
 
-      /** @type {ShardBuilderEntry[]} */
+      /** @type {BatcherShardEntry[]} */
       const entries = matches
         .filter(m => m[0] !== prefix)
         .map(m => {
@@ -102,7 +102,7 @@ class ShardBuilder {
           return m
         })
 
-      const builder = new ShardBuilder({
+      const builder = new Batcher({
         shards: this.shards,
         entries,
         config: this.config,
@@ -135,7 +135,7 @@ class ShardBuilder {
    * the passed key.
    *
    * @param {string} key
-   * @returns {Promise<{ builder: ShardBuilder, key: string }>}
+   * @returns {Promise<{ builder: Batcher, key: string }>}
    */
   async traverse (key) {
     for (const e of this.entries) {
@@ -143,7 +143,7 @@ class ShardBuilder {
       if (key === k) break
       if (key.startsWith(k) && Array.isArray(v)) {
         if (v[0] !== placeholder) {
-          e[2] = await ShardBuilder.create(this.shards, v[0], this.prefix + k)
+          e[2] = await Batcher.create(this.shards, v[0], this.prefix + k)
         }
         if (!e[2]) throw new Error('missing builder')
         return e[2].traverse(key.slice(k.length))
@@ -152,7 +152,7 @@ class ShardBuilder {
     return { builder: this, key }
   }
 
-  async build () {
+  async commit () {
     /** @type {API.ShardBlockView[]} */
     const additions = []
     /** @type {API.ShardBlockView[]} */
@@ -162,7 +162,7 @@ class ShardBuilder {
     const entries = []
     for (const entry of this.entries) {
       if (entry[2]) {
-        const result = await entry[2].build()
+        const result = await entry[2].commit()
         entries.push([
           entry[0],
           Array.isArray(entry[1])
@@ -193,7 +193,7 @@ class ShardBuilder {
    */
   static async create (shards, link, prefix) {
     const base = await shards.get(link)
-    return new ShardBuilder({
+    return new Batcher({
       shards,
       entries: asShardBuilderEntries(base.value.entries),
       prefix,
@@ -203,21 +203,21 @@ class ShardBuilder {
   }
 }
 
-/** @param {ShardBuilderEntry[]} entries */
+/** @param {BatcherShardEntry[]} entries */
 const asShardEntries = entries => /** @type {API.ShardEntry[]} */ (entries)
 
-/** @param {ShardBuilderEntry} entry */
+/** @param {BatcherShardEntry} entry */
 const asShardEntry = entry => /** @type {API.ShardEntry} */ (entry)
 
 /** @param {API.ShardEntry[]} entries */
-const asShardBuilderEntries = entries => /** @type {ShardBuilderEntry[]} */ (entries)
+const asShardBuilderEntries = entries => /** @type {BatcherShardEntry[]} */ (entries)
 
 /**
  * @param {API.BlockFetcher} blocks Bucket block storage.
  * @param {API.ShardLink} link CID of the shard block.
- * @returns {Promise<API.ShardBuilder>}
+ * @returns {Promise<API.Batcher>}
  */
 export const create = (blocks, link) => {
   const shards = new ShardFetcher(blocks)
-  return ShardBuilder.create(shards, link, '')
+  return Batcher.create(shards, link, '')
 }

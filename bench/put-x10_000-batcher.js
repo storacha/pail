@@ -1,6 +1,6 @@
 // eslint-disable-next-line no-unused-vars
 import * as API from '../src/api.js'
-import * as Builder from '../src/builder.js'
+import * as Batch from '../src/batch.js'
 import { ShardBlock } from '../src/shard.js'
 import { MemoryBlockstore } from '../src/block.js'
 import { randomCID, randomString, randomInteger } from '../test/helpers.js'
@@ -25,14 +25,14 @@ async function main () {
 
   console.log('bench')
   console.time(`put x${NUM}`)
-  const builder = await Builder.create(blocks, rootBlock.cid)
+  const batch = await Batch.create(blocks, rootBlock.cid)
   for (let i = 0; i < kvs.length; i++) {
-    await builder.put(kvs[i][0], kvs[i][1])
+    await batch.put(kvs[i][0], kvs[i][1])
     if (i % 1000 === 0) {
       process.stdout.write('.')
     }
   }
-  const result = await builder.build()
+  const result = await batch.commit()
   for (const b of result.additions) {
     blocks.putSync(b.cid, b.bytes)
   }
