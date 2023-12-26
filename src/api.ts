@@ -54,6 +54,12 @@ export interface Batcher {
   commit (): Promise<{ root: ShardLink } & ShardDiff>
 }
 
+export interface Operation {
+  type: 'put',
+  key: string
+  value: UnknownLink
+}
+
 // Clock //////////////////////////////////////////////////////////////////////
 
 export type EventLink<T> = Link<EventView<T>>

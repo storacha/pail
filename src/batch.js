@@ -72,7 +72,7 @@ class Batcher {
         batcher = new Batcher({
           shards: this.shards,
           entries: [entry],
-          prefix: pfxskeys[pfxskeys.length - 1].prefix,
+          prefix: pfxskeys[i].prefix,
           config: this.config
         })
       }
@@ -178,7 +178,7 @@ class Batcher {
       }
     }
 
-    const block = await Shard.encodeBlock(Shard.withEntries(entries, this.config))
+    const block = await Shard.encodeBlock(Shard.withEntries(entries, this.config), this.prefix)
     additions.push(block)
 
     if (this.base) removals.push(this.base)
@@ -214,10 +214,10 @@ const asShardbatcherEntries = entries => /** @type {BatcherShardEntry[]} */ (ent
 
 /**
  * @param {API.BlockFetcher} blocks Bucket block storage.
- * @param {API.ShardLink} link CID of the shard block.
+ * @param {API.ShardLink} root CID of the root shard block.
  * @returns {Promise<API.Batcher>}
  */
-export const create = (blocks, link) => {
+export const create = (blocks, root) => {
   const shards = new ShardFetcher(blocks)
-  return Batcher.create(shards, link, '')
+  return Batcher.create(shards, root, '')
 }

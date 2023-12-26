@@ -29,8 +29,8 @@ export function randomString (size, alphabet = Alphabet) {
   return str
 }
 
-/** @param {number} size */
-export async function randomCID (size) {
+/** @param {number} [size] Number of random bytes to hash. */
+export async function randomCID (size = 32) {
   const hash = await sha256.digest(await randomBytes(size))
   return Link.create(raw.code, hash)
 }
