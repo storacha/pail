@@ -17,7 +17,8 @@ npm install @alanshaw/pail
 ## Usage
 
 ```js
-import { ShardBlock, put, get, del } from '@alanshaw/pail'
+import { put, get, del } from '@alanshaw/pail'
+import { ShardBlock } from '@alanshaw/pail/shard'
 import { MemoryBlockstore } from '@alanshaw/pail/block'
 
 // Initialize a new bucket
@@ -27,6 +28,41 @@ await blocks.put(init.cid, init.bytes)
 
 // Add a key and value to the bucket
 const { root, additions, removals } = await put(blocks, init.cid, 'path/to/data0', dataCID0)
+
+console.log(`new root: ${root}`)
+
+// Process the diff
+for (const block of additions) {
+  await blocks.put(block.cid, block.bytes)
+}
+for (const block of removals) {
+  await blocks.delete(block.cid)
+}
+```
+
+### Batch operations
+
+If adding many multiple items to the pail together, it is faster to batch them together.
+
+```js
+import { put, get, del } from '@alanshaw/pail'
+import { ShardBlock } from '@alanshaw/pail/shard'
+import { MemoryBlockstore } from '@alanshaw/pail/block'
+import * as Batcher from '@alanshaw/pail/batch'
+
+// Initialize a new bucket
+const blocks = new MemoryBlockstore()
+const init = await ShardBlock.create() // empty root shard
+await blocks.put(init.cid, init.bytes)
+
+const batch = await Batcher.create(blocks, init.cid)
+
+// items is an array of `{ key: string, value: CID }` - the items to add to the pail
+for (const item of items) {
+  await batch.put(item.key, item.value)
+}
+
+const { root, additions, removals } = await batch.commit()
 
 console.log(`new root: ${root}`)
 
