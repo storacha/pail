@@ -175,5 +175,5 @@ export const vis = async function * (blocks, head, options = {}) {
   yield '}'
 }
 
-/** @param {API.UnknownLink} l */
+/** @param {import('multiformats').UnknownLink} l */
 const shortLink = l => `${String(l).slice(0, 4)}..${String(l).slice(-4)}`

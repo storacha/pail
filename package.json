@@ -23,10 +23,19 @@
         "dist/src/block.d.ts"
       ],
       "clock": [
-        "dist/src/clock.d.ts"
+        "dist/src/clock/index.d.ts"
+      ],
+      "clock/api": [
+        "dist/src/clock/api.d.ts"
       ],
       "crdt": [
-        "dist/src/crdt.d.ts"
+        "dist/src/crdt/index.d.ts"
+      ],
+      "crdt/api": [
+        "dist/src/crdt/api.d.ts"
+      ],
+      "crdt/batch": [
+        "dist/src/crdt/batch.d.ts"
       ],
       "diff": [
         "dist/src/diff.d.ts"
@@ -60,12 +69,24 @@
       "import": "./src/block.js"
     },
     "./clock": {
-      "types": "./dist/src/clock.d.ts",
-      "import": "./src/clock.js"
+      "types": "./dist/src/clock/index.d.ts",
+      "import": "./src/clock/index.js"
+    },
+    "./clock/api": {
+      "types": "./dist/src/clock/api.d.ts",
+      "import": "./src/clock/api.js"
     },
     "./crdt": {
-      "types": "./dist/src/crdt.d.ts",
-      "import": "./src/crdt.js"
+      "types": "./dist/src/crdt/index.d.ts",
+      "import": "./src/crdt/index.js"
+    },
+    "./crdt/api": {
+      "types": "./dist/src/crdt/api.d.ts",
+      "import": "./src/crdt/api.js"
+    },
+    "./crdt/batch": {
+      "types": "./dist/src/crdt/batch.d.ts",
+      "import": "./src/crdt/batch.js"
     },
     "./diff": {
       "types": "./dist/src/diff.d.ts",

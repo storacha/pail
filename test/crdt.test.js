@@ -1,9 +1,9 @@
 import { describe, it } from 'mocha'
 import assert from 'node:assert'
 // eslint-disable-next-line no-unused-vars
-import * as API from '../src/api.js'
-import { advance, vis } from '../src/clock.js'
-import { put, get, root, entries } from '../src/crdt.js'
+import * as API from '../src/crdt/api.js'
+import { advance, vis } from '../src/clock/index.js'
+import { put, get, root, entries } from '../src/crdt/index.js'
 import { Blockstore, randomCID } from './helpers.js'
 
 describe('CRDT', () => {
@@ -15,7 +15,7 @@ describe('CRDT', () => {
     const { event, head } = await alice.putAndVis(key, value)
 
     assert(event)
-    assert.equal(event.value.data.type, 'put')
+    assert(event.value.data.type === 'put')
     assert.equal(event.value.data.key, key)
     assert.equal(event.value.data.value.toString(), value.toString())
     assert.equal(head.length, 1)
@@ -35,7 +35,7 @@ describe('CRDT', () => {
     const result = await alice.putAndVis(key1, value1)
 
     assert(result.event)
-    assert.equal(result.event.value.data.type, 'put')
+    assert(result.event.value.data.type === 'put')
     assert.equal(result.event.value.data.key, key1)
     assert.equal(result.event.value.data.value.toString(), value1.toString())
     assert.equal(result.head.length, 1)
@@ -180,7 +180,7 @@ describe('CRDT', () => {
 class TestPail {
   /**
    * @param {Blockstore} blocks
-   * @param {API.EventLink<API.EventData>[]} head
+   * @param {API.EventLink<API.Operation>[]} head
    */
   constructor (blocks, head) {
     this.blocks = blocks
@@ -189,7 +189,7 @@ class TestPail {
     this.root = null
   }
 
-  /** @param {API.EventLink<API.EventData>} event */
+  /** @param {API.EventLink<API.Operation>} event */
   async advance (event) {
     this.head = await advance(this.blocks, this.head, event)
     const result = await root(this.blocks, this.head)
@@ -219,11 +219,17 @@ class TestPail {
     const result = await this.put(key, value)
     /** @param {API.UnknownLink} l */
     const shortLink = l => `${String(l).slice(0, 4)}..${String(l).slice(-4)}`
-    /** @type {(e: API.EventBlockView<API.EventData>) => string} */
+    /** @param {API.PutOperation|API.DeleteOperation} o */
+    const renderOp = o => `${o.type}(${o.key}${o.type === 'put' ? `${shortLink(o.value)}` : ''})`
+    /** @type {(e: API.EventBlockView<API.Operation>) => string} */
     const renderNodeLabel = event => {
-      return event.value.data.type === 'put'
-        ? `${shortLink(event.cid)}\\nput(${event.value.data.key}, ${shortLink(event.value.data.value)})`
-        : `${shortLink(event.cid)}\\ndel(${event.value.data.key})`
+      if (event.value.data.type === 'put' || event.value.data.type === 'del') {
+        return `${shortLink(event.cid)}\\n${renderOp(event.value.data)})`
+      } else if (event.value.data.type === 'batch') {
+        return `${shortLink(event.cid)}\\nbatch(${event.value.data.ops.map(renderOp)})`
+      }
+      // @ts-expect-error
+      throw new Error(`unknown operation: ${event.value.data.type}`)
     }
     for await (const line of vis(this.blocks, result.head, { renderNodeLabel })) {
       console.log(line)

@@ -1,28 +1,21 @@
 // eslint-disable-next-line no-unused-vars
 import * as API from './api.js'
-import * as Clock from './clock.js'
-import { EventFetcher, EventBlock } from './clock.js'
-import * as Pail from './index.js'
-import { ShardBlock } from './shard.js'
-import { MemoryBlockstore, MultiBlockFetcher } from './block.js'
-
-/**
- * @typedef {{
- *   root: API.ShardLink
- *   head: API.EventLink<API.EventData>[]
- *   event?: API.EventBlockView<API.EventData>
- * } & API.ShardDiff} Result
- */
+import * as Clock from '../clock/index.js'
+import { EventFetcher, EventBlock } from '../clock/index.js'
+import * as Pail from '../index.js'
+import { ShardBlock } from '../shard.js'
+import { MemoryBlockstore, MultiBlockFetcher } from '../block.js'
+import * as Batch from '../batch.js'
 
 /**
  * Put a value (a CID) for the given key. If the key exists it's value is
  * overwritten.
  *
  * @param {API.BlockFetcher} blocks Bucket block storage.
- * @param {API.EventLink<API.EventData>[]} head Merkle clock head.
+ * @param {API.EventLink<API.Operation>[]} head Merkle clock head.
  * @param {string} key The key of the value to put.
  * @param {API.UnknownLink} value The value to put.
- * @returns {Promise<Result>}
+ * @returns {Promise<API.Result>}
  */
 export const put = async (blocks, head, key, value) => {
   const mblocks = new MemoryBlockstore()
@@ -32,7 +25,7 @@ export const put = async (blocks, head, key, value) => {
     const shard = await ShardBlock.create()
     mblocks.putSync(shard.cid, shard.bytes)
     const result = await Pail.put(blocks, shard.cid, key, value)
-    /** @type {API.EventData} */
+    /** @type {API.Operation} */
     const data = { type: 'put', root: result.root, key, value }
     const event = await EventBlock.create(data, head)
     head = await Clock.advance(blocks, head, event.cid)
@@ -45,7 +38,7 @@ export const put = async (blocks, head, key, value) => {
     }
   }
 
-  /** @type {EventFetcher<API.EventData>} */
+  /** @type {EventFetcher<API.Operation>} */
   const events = new EventFetcher(blocks)
   const ancestor = await findCommonAncestor(events, head)
   if (!ancestor) throw new Error('failed to find common ancestor event')
@@ -60,12 +53,22 @@ export const put = async (blocks, head, key, value) => {
   const removals = new Map()
 
   for (const { value: event } of sorted) {
-    if (!['put', 'del'].includes(event.data.type)) {
-      throw new Error(`unknown event type: ${event.data.type}`)
+    let result
+    if (event.data.type === 'put') {
+      result = await Pail.put(blocks, root, event.data.key, event.data.value)
+    } else if (event.data.type === 'del') {
+      result = await Pail.del(blocks, root, event.data.key)
+    } else if (event.data.type === 'batch') {
+      const batch = await Batch.create(blocks, root)
+      for (const op of event.data.ops) {
+        if (op.type !== 'put') throw new Error(`unsupported batch operation: ${op.type}`)
+        await batch.put(op.key, op.value)
+      }
+      result = await batch.commit()
+    } else {
+      // @ts-expect-error type does not exist on never
+      throw new Error(`unknown operation: ${event.data.type}`)
     }
-    const result = event.data.type === 'put'
-      ? await Pail.put(blocks, root, event.data.key, event.data.value)
-      : await Pail.del(blocks, root, event.data.key)
 
     root = result.root
     for (const a of result.additions) {
@@ -91,7 +94,7 @@ export const put = async (blocks, head, key, value) => {
     removals.set(r.cid.toString(), r)
   }
 
-  /** @type {API.EventData} */
+  /** @type {API.Operation} */
   const data = { type: 'put', root: result.root, key, value }
   const event = await EventBlock.create(data, head)
   mblocks.putSync(event.cid, event.bytes)
@@ -119,10 +122,10 @@ export const put = async (blocks, head, key, value) => {
  * no operation occurs.
  *
  * @param {API.BlockFetcher} blocks Bucket block storage.
- * @param {API.EventLink<API.EventData>[]} head Merkle clock head.
+ * @param {API.EventLink<API.Operation>[]} head Merkle clock head.
  * @param {string} key The key of the value to delete.
  * @param {object} [options]
- * @returns {Promise<Result>}
+ * @returns {Promise<API.Result>}
  */
 export const del = async (blocks, head, key, options) => {
   throw new Error('not implemented')
@@ -135,7 +138,7 @@ export const del = async (blocks, head, key, options) => {
  * removed while playing forward events from their common ancestor.
  *
  * @param {API.BlockFetcher} blocks Bucket block storage.
- * @param {API.EventLink<API.EventData>[]} head Merkle clock head.
+ * @param {API.EventLink<API.Operation>[]} head Merkle clock head.
  * @returns {Promise<{ root: API.ShardLink } & API.ShardDiff>}
  */
 export const root = async (blocks, head) => {
@@ -144,7 +147,7 @@ export const root = async (blocks, head) => {
   const mblocks = new MemoryBlockstore()
   blocks = new MultiBlockFetcher(mblocks, blocks)
 
-  /** @type {EventFetcher<API.EventData>} */
+  /** @type {EventFetcher<API.Operation>} */
   const events = new EventFetcher(blocks)
 
   if (head.length === 1) {
@@ -166,12 +169,22 @@ export const root = async (blocks, head) => {
   const removals = new Map()
 
   for (const { value: event } of sorted) {
-    if (!['put', 'del'].includes(event.data.type)) {
-      throw new Error(`unknown event type: ${event.data.type}`)
+    let result
+    if (event.data.type === 'put') {
+      result = await Pail.put(blocks, root, event.data.key, event.data.value)
+    } else if (event.data.type === 'del') {
+      result = await Pail.del(blocks, root, event.data.key)
+    } else if (event.data.type === 'batch') {
+      const batch = await Batch.create(blocks, root)
+      for (const op of event.data.ops) {
+        if (op.type !== 'put') throw new Error(`unsupported batch operation: ${op.type}`)
+        await batch.put(op.key, op.value)
+      }
+      result = await batch.commit()
+    } else {
+      // @ts-expect-error type does not exist on never
+      throw new Error(`unknown operation: ${event.data.type}`)
     }
-    const result = event.data.type === 'put'
-      ? await Pail.put(blocks, root, event.data.key, event.data.value)
-      : await Pail.del(blocks, root, event.data.key)
 
     root = result.root
     for (const a of result.additions) {
@@ -200,7 +213,7 @@ export const root = async (blocks, head) => {
 
 /**
  * @param {API.BlockFetcher} blocks Bucket block storage.
- * @param {API.EventLink<API.EventData>[]} head Merkle clock head.
+ * @param {API.EventLink<API.Operation>[]} head Merkle clock head.
  * @param {string} key The key of the value to retrieve.
  */
 export const get = async (blocks, head, key) => {
@@ -214,7 +227,7 @@ export const get = async (blocks, head, key) => {
 
 /**
  * @param {API.BlockFetcher} blocks Bucket block storage.
- * @param {API.EventLink<API.EventData>[]} head Merkle clock head.
+ * @param {API.EventLink<API.Operation>[]} head Merkle clock head.
  * @param {object} [options]
  * @param {string} [options.prefix]
  */
@@ -231,8 +244,8 @@ export const entries = async function * (blocks, head, options) {
  * Find the common ancestor event of the passed children. A common ancestor is
  * the first single event in the DAG that _all_ paths from children lead to.
  *
- * @param {EventFetcher<API.EventData>} events
- * @param  {API.EventLink<API.EventData>[]} children
+ * @param {EventFetcher<API.Operation>} events
+ * @param  {API.EventLink<API.Operation>[]} children
  */
 const findCommonAncestor = async (events, children) => {
   if (!children.length) return
@@ -252,8 +265,8 @@ const findCommonAncestor = async (events, children) => {
 }
 
 /**
- * @param {EventFetcher<API.EventData>} events
- * @param {API.EventLink<API.EventData>} root
+ * @param {EventFetcher<API.Operation>} events
+ * @param {API.EventLink<API.Operation>} root
  */
 const findAncestorCandidate = async (events, root) => {
   const { value: event } = await events.get(root)
@@ -284,13 +297,13 @@ const findCommonString = (arrays) => {
 
 /**
  * Find and sort events between the head(s) and the tail.
- * @param {EventFetcher<API.EventData>} events
- * @param {API.EventLink<API.EventData>[]} head
- * @param {API.EventLink<API.EventData>} tail
+ * @param {EventFetcher<API.Operation>} events
+ * @param {API.EventLink<API.Operation>[]} head
+ * @param {API.EventLink<API.Operation>} tail
  */
 const findSortedEvents = async (events, head, tail) => {
   // get weighted events - heavier events happened first
-  /** @type {Map<string, { event: API.EventBlockView<API.EventData>, weight: number }>} */
+  /** @type {Map<string, { event: API.EventBlockView<API.Operation>, weight: number }>} */
   const weights = new Map()
   const all = await Promise.all(head.map(h => findEvents(events, h, tail)))
   for (const arr of all) {
@@ -305,7 +318,7 @@ const findSortedEvents = async (events, head, tail) => {
   }
 
   // group events into buckets by weight
-  /** @type {Map<number, API.EventBlockView<API.EventData>[]>} */
+  /** @type {Map<number, API.EventBlockView<API.Operation>[]>} */
   const buckets = new Map()
   for (const { event, weight } of weights.values()) {
     const bucket = buckets.get(weight)
@@ -323,10 +336,10 @@ const findSortedEvents = async (events, head, tail) => {
 }
 
 /**
- * @param {EventFetcher<API.EventData>} events
- * @param {API.EventLink<API.EventData>} start
- * @param {API.EventLink<API.EventData>} end
- * @returns {Promise<Array<{ event: API.EventBlockView<API.EventData>, depth: number }>>}
+ * @param {EventFetcher<API.Operation>} events
+ * @param {API.EventLink<API.Operation>} start
+ * @param {API.EventLink<API.Operation>} end
+ * @returns {Promise<Array<{ event: API.EventBlockView<API.Operation>, depth: number }>>}
  */
 const findEvents = async (events, start, end, depth = 0) => {
   const event = await events.get(start)

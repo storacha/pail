@@ -53,29 +53,3 @@ export interface Batcher {
   // del (key: string): Promise<void>
   commit (): Promise<{ root: ShardLink } & ShardDiff>
 }
-
-export interface Operation {
-  type: 'put',
-  key: string
-  value: UnknownLink
-}
-
-// Clock //////////////////////////////////////////////////////////////////////
-
-export type EventLink<T> = Link<EventView<T>>
-
-export interface EventView<T> {
-  parents: EventLink<T>[]
-  data: T
-}
-
-export interface EventBlockView<T> extends BlockView<EventView<T>> {}
-
-// CRDT ///////////////////////////////////////////////////////////////////////
-
-export interface EventData {
-  type: 'put'|'del'
-  key: string
-  value: UnknownLink
-  root: ShardLink
-}

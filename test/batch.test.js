@@ -13,7 +13,6 @@ describe('batch', () => {
     const blocks = new Blockstore()
     await blocks.put(rootblk.cid, rootblk.bytes)
 
-    /** @type {API.Operation[]} */
     const ops = []
     for (let i = 0; i < 1000; i++) {
       ops.push({ type: 'put', key: `test${randomString(10)}`, value: await randomCID() })
@@ -47,7 +46,6 @@ describe('batch', () => {
     const blocks = new Blockstore()
     await blocks.put(root.cid, root.bytes)
 
-    /** @type {API.Operation[]} */
     const ops = [
       { type: 'put', key: 'testymctestface', value: await randomCID() },
       { type: 'put', key: 'testing123', value: await randomCID() },
