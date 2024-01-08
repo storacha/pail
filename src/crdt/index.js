@@ -5,7 +5,7 @@ import { EventFetcher, EventBlock } from '../clock/index.js'
 import * as Pail from '../index.js'
 import { ShardBlock } from '../shard.js'
 import { MemoryBlockstore, MultiBlockFetcher } from '../block.js'
-import * as Batch from '../batch.js'
+import * as Batch from '../batch/index.js'
 
 /**
  * Put a value (a CID) for the given key. If the key exists it's value is

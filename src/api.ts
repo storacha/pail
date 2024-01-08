@@ -17,12 +17,8 @@ export type ShardLinkEntry = [key: string, value: ShardEntryLinkValue | ShardEnt
 /** Single key/value entry within a shard. */
 export type ShardEntry = [key: string, value: ShardEntryValueValue | ShardEntryLinkValue | ShardEntryLinkAndValueValue]
 
-export interface Shard {
+export interface Shard extends ShardConfig {
   entries: ShardEntry[]
-  /** Max key length (in UTF-8 encoded characters) - default 64. */
-  maxKeyLength: number
-  /** Max encoded shard size in bytes - default 512 KiB. */
-  maxSize: number
 }
 
 export type ShardLink = Link<Shard, typeof dagCBOR.code, typeof sha256.code, 1>
@@ -42,14 +38,10 @@ export interface BlockFetcher {
 }
 
 export interface ShardConfig {
+  /** Max encoded shard size in bytes - default 512 KiB. */
   maxSize: number
+  /** Max key length (in UTF-8 encoded characters) - default 64. */
   maxKeyLength: number
 }
 
 export type ShardOptions = Partial<ShardConfig>
-
-export interface Batcher {
-  put (key: string, value: UnknownLink): Promise<void>
-  // del (key: string): Promise<void>
-  commit (): Promise<{ root: ShardLink } & ShardDiff>
-}

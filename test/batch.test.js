@@ -4,7 +4,7 @@ import assert from 'node:assert'
 import * as API from '../src/api.js'
 import { ShardBlock } from '../src/shard.js'
 import * as Pail from '../src/index.js'
-import * as Batch from '../src/batch.js'
+import * as Batch from '../src/batch/index.js'
 import { Blockstore, randomCID, randomString } from './helpers.js'
 
 describe('batch', () => {
