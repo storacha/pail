@@ -1,6 +1,7 @@
+import * as Link from 'multiformats/link'
 import { Block, encode, decode } from 'multiformats/block'
 import { sha256 } from 'multiformats/hashes/sha2'
-import * as cbor from '@ipld/dag-cbor'
+import * as dagCBOR from '@ipld/dag-cbor'
 import { tokensToLength } from 'cborg/length'
 import { Token, Type } from 'cborg'
 // eslint-disable-next-line no-unused-vars
@@ -12,7 +13,7 @@ export const MaxShardSize = 512 * 1024
 const CID_TAG = new Token(Type.tag, 42)
 
 /**
- * @extends {Block<API.Shard, typeof cbor.code, typeof sha256.code, 1>}
+ * @extends {Block<API.Shard, typeof dagCBOR.code, typeof sha256.code, 1>}
  * @implements {API.ShardBlockView}
  */
 export class ShardBlock extends Block {
@@ -66,7 +67,7 @@ const decodeCache = new WeakMap()
  * @returns {Promise<API.ShardBlockView>}
  */
 export const encodeBlock = async (value, prefix) => {
-  const { cid, bytes } = await encode({ value, codec: cbor, hasher: sha256 })
+  const { cid, bytes } = await encode({ value, codec: dagCBOR, hasher: sha256 })
   const block = new ShardBlock({ cid, value, bytes, prefix: prefix ?? '' })
   decodeCache.set(block.bytes, block)
   return block
@@ -80,7 +81,7 @@ export const encodeBlock = async (value, prefix) => {
 export const decodeBlock = async (bytes, prefix) => {
   const block = decodeCache.get(bytes)
   if (block) return block
-  const { cid, value } = await decode({ bytes, codec: cbor, hasher: sha256 })
+  const { cid, value } = await decode({ bytes, codec: dagCBOR, hasher: sha256 })
   if (!isShard(value)) throw new Error(`invalid shard: ${cid}`)
   return new ShardBlock({ cid, value, bytes, prefix: prefix ?? '' })
 }
@@ -89,12 +90,20 @@ export const decodeBlock = async (bytes, prefix) => {
  * @param {any} value
  * @returns {value is API.Shard}
  */
-const isShard = (value) =>
+export const isShard = (value) =>
   value != null &&
   typeof value === 'object' &&
   Array.isArray(value.entries) &&
   typeof value.maxSize === 'number' &&
   typeof value.maxKeyLength === 'number'
+
+/**
+ * @param {any} value
+ * @returns {value is API.ShardLink}
+ */
+export const isShardLink = (value) =>
+  Link.isLink(value) &&
+  value.code === dagCBOR.code
 
 export class ShardFetcher {
   /** @param {API.BlockFetcher} blocks */

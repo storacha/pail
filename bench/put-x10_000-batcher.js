@@ -1,6 +1,6 @@
 // eslint-disable-next-line no-unused-vars
 import * as API from '../src/api.js'
-import * as Batch from '../src/batch.js'
+import * as Batch from '../src/batch/index.js'
 import { ShardBlock } from '../src/shard.js'
 import { MemoryBlockstore } from '../src/block.js'
 import { randomCID, randomString, randomInteger } from '../test/helpers.js'

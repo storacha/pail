@@ -1,29 +1,42 @@
-import * as Link from 'multiformats/link'
 // eslint-disable-next-line no-unused-vars
 import * as API from './api.js'
 import { ShardFetcher } from '../shard.js'
 import * as Shard from '../shard.js'
+import * as BatcherShard from './shard.js'
 
-/**
- * @template {API.BatcherShard} T
- * @implements {API.Batcher}
- */
-class Batcher {
+export const BatchCommittedErrorCode = 'ERR_BATCH_COMMITTED'
+
+export class BatchCommittedError extends Error {
   /**
-   * @param {object} arg
-   * @param {ShardFetcher} arg.shards Shard storage.
-   * @param {API.BatcherShardEntry<T>[]} arg.entries The entries in this shard.
-   * @param {string} arg.prefix Key prefix.
-   * @param {API.ShardConfig} arg.config Shard config.
-   * @param {API.ShardBlockView} [arg.base] Original shard this batcher is based on.
+   * @param {string} [message]
+   * @param {ErrorOptions} [options]
    */
-  constructor ({ shards, entries, prefix, config, base }) {
-    this.shards = shards
+  constructor (message, options) {
+    super(message ?? 'batch already committed', options)
+    this.code = BatchCommittedErrorCode
+  }
+}
+
+/** @implements {API.Batcher} */
+class Batcher {
+  #committed = false
+
+  /**
+   * @param {object} init
+   * @param {API.BlockFetcher} init.blocks Block storage.
+   * @param {API.BatcherShardEntry[]} init.entries The entries in this shard.
+   * @param {string} init.prefix Key prefix.
+   * @param {number} init.maxSize
+   * @param {number} init.maxKeyLength
+   * @param {API.ShardBlockView} init.base Original shard this batcher is based on.
+   */
+  constructor ({ blocks, entries, prefix, maxSize, maxKeyLength, base }) {
+    this.blocks = blocks
     this.prefix = prefix
     this.entries = entries
     this.base = base
-    this.maxSize = config.maxSize
-    this.maxKeyLength = config.maxKeyLength
+    this.maxSize = maxSize
+    this.maxKeyLength = maxKeyLength
   }
 
   /**
@@ -32,58 +45,47 @@ class Batcher {
    * @returns {Promise<void>}
    */
   async put (key, value) {
-    return put({
-      shards: this.shards,
-      shard: this,
-      key,
-      value,
-      createShard: arg => new Batcher(arg),
-      fetchShard: Batcher.create
-    })
+    if (this.#committed) throw new BatchCommittedError()
+    return put(this.blocks, this, key, value)
   }
 
   async commit () {
+    if (this.#committed) throw new BatchCommittedError()
+    this.#committed = true
     return commit(this)
   }
 
   /**
-   * @param {object} arg
-   * @param {ShardFetcher} arg.shards Shard storage.
-   * @param {API.ShardLink} arg.link CID of the shard block.
-   * @param {string} arg.prefix
+   * @param {object} init
+   * @param {API.BlockFetcher} init.blocks Block storage.
+   * @param {API.ShardLink} init.link CID of the shard block.
+   * @param {string} init.prefix
    */
-  static async create ({ shards, link, prefix }) {
+  static async create ({ blocks, link, prefix }) {
+    const shards = new ShardFetcher(blocks)
     const base = await shards.get(link)
-    return new Batcher({
-      shards,
-      entries: asBatcherShardEntries(base.value.entries),
-      prefix,
-      config: Shard.configure(base.value),
-      base
-    })
+    return new Batcher({ blocks, entries: base.value.entries, prefix, base, ...Shard.configure(base.value) })
   }
 }
 
 /**
- * @template {API.BatcherShard} T
- * @param {object} arg
- * @param {ShardFetcher} arg.shards
- * @param {API.BatcherShard} arg.shard
- * @param {string} arg.key The key of the value to put.
- * @param {API.UnknownLink} arg.value The value to put.
- * @param {(arg: { shards: ShardFetcher, entries: API.BatcherShardEntry<T>[], prefix: string, config: API.ShardConfig }) => T} arg.createShard
- * @param {(arg: { shards: ShardFetcher, link: API.ShardLink, prefix: string }) => Promise<T>} arg.fetchShard
+ * @param {API.BlockFetcher} blocks
+ * @param {API.BatcherShard} shard
+ * @param {string} key The key of the value to put.
+ * @param {API.UnknownLink} value The value to put.
  * @returns {Promise<void>}
  */
-export const put = async ({ shards, shard, key, value, createShard, fetchShard }) => {
-  const dest = await traverse({ shards, key, shard, fetchShard })
+export const put = async (blocks, shard, key, value) => {
+  const shards = new ShardFetcher(blocks)
+  const dest = await traverse(shards, key, shard)
   if (dest.shard !== shard) {
-    return put({ shards, ...dest, value, createShard, fetchShard })
+    shard = dest.shard
+    key = dest.key
   }
 
-  /** @type {API.BatcherShardEntry<T>} */
-  let entry = [dest.key, value]
-  /** @type {T|undefined} */
+  /** @type {API.BatcherShardEntry} */
+  let entry = [key, value]
+  /** @type {API.BatcherShard|undefined} */
   let batcher
 
   // if the key in this shard is longer than allowed, then we need to make some
@@ -98,20 +100,18 @@ export const put = async ({ shards, shard, key, value, createShard, fetchShard }
     })
 
     entry = [pfxskeys[pfxskeys.length - 1].key, value]
-    batcher = createShard({
-      shards,
+    batcher = BatcherShard.create({
       entries: [entry],
       prefix: pfxskeys[pfxskeys.length - 1].prefix,
-      config: shard
+      ...Shard.configure(shard)
     })
 
     for (let i = pfxskeys.length - 2; i > 0; i--) {
       entry = [pfxskeys[i].key, [batcher]]
-      batcher = createShard({
-        shards,
+      batcher = BatcherShard.create({
         entries: [entry],
         prefix: pfxskeys[i].prefix,
-        config: shard
+        ...Shard.configure(shard)
       })
     }
 
@@ -129,8 +129,8 @@ export const put = async ({ shards, shard, key, value, createShard, fetchShard }
     )
     if (!common) throw new Error('shard limit reached')
     const { prefix } = common
-    /** @type {API.BatcherShardEntry<T>[]} */
-    const matches = asBatcherShardEntries(common.matches)
+    /** @type {API.BatcherShardEntry[]} */
+    const matches = common.matches
 
     const entries = matches
       .filter(m => m[0] !== prefix)
@@ -140,14 +140,13 @@ export const put = async ({ shards, shard, key, value, createShard, fetchShard }
         return m
       })
 
-    const batcher = createShard({
-      shards,
+    const batcher = BatcherShard.create({
       entries,
-      config: shard,
-      prefix: shard.prefix + prefix
+      prefix: shard.prefix + prefix,
+      ...Shard.configure(shard)
     })
 
-    /** @type {API.ShardEntryShardValue<T> | API.ShardEntryShardAndValueValue<T>} */
+    /** @type {API.ShardEntryShardValue | API.ShardEntryShardAndValueValue} */
     let value
     const pfxmatch = matches.find(m => m[0] === prefix)
     if (pfxmatch) {
@@ -172,23 +171,21 @@ export const put = async ({ shards, shard, key, value, createShard, fetchShard }
  * Traverse from the passed shard through to the correct shard for the passed
  * key.
  *
- * @template {API.BatcherShard} T
- * @param {object} arg
- * @param {ShardFetcher} arg.shards
- * @param {string} arg.key
- * @param {T} arg.shard
- * @param {(arg: { shards: ShardFetcher, link: API.ShardLink, prefix: string }) => Promise<T>} arg.fetchShard
- * @returns {Promise<{ shard: T, key: string }>}
+ * @param {ShardFetcher} shards
+ * @param {string} key
+ * @param {API.BatcherShard} shard
+ * @returns {Promise<{ shard: API.BatcherShard, key: string }>}
  */
-export const traverse = async ({ shards, key, shard, fetchShard }) => {
+export const traverse = async (shards, key, shard) => {
   for (const e of shard.entries) {
     const [k, v] = e
-    if (key === k) break
+    if (key <= k) break
     if (key.startsWith(k) && Array.isArray(v)) {
-      if (isShardLink(v[0])) {
-        v[0] = await fetchShard({ shards, link: v[0], prefix: shard.prefix + k })
+      if (Shard.isShardLink(v[0])) {
+        const blk = await shards.get(v[0], shard.prefix + k)
+        v[0] = BatcherShard.create({ base: blk, prefix: blk.prefix, ...blk.value })
       }
-      return traverse({ shards, key: key.slice(k.length), shard: v[0], fetchShard })
+      return traverse(shards, key.slice(k.length), v[0])
     }
   }
   return { shard, key }
@@ -209,7 +206,7 @@ export const commit = async shard => {
   /** @type {API.ShardEntry[]} */
   const entries = []
   for (const entry of shard.entries) {
-    if (Array.isArray(entry[1]) && !isShardLink(entry[1][0])) {
+    if (Array.isArray(entry[1]) && !Shard.isShardLink(entry[1][0])) {
       const result = await commit(entry[1][0])
       entries.push([
         entry[0],
@@ -225,35 +222,24 @@ export const commit = async shard => {
   const block = await Shard.encodeBlock(Shard.withEntries(entries, shard), shard.prefix)
   additions.push(block)
 
+  if (shard.base && shard.base.cid.toString() === block.cid.toString()) {
+    return { root: block.cid, additions: [], removals: [] }
+  }
+
   if (shard.base) removals.push(shard.base)
 
   return { root: block.cid, additions, removals }
 }
 
-/**
- * @param {any} value
- * @returns {value is API.ShardLink}
- */
-const isShardLink = (value) => Link.isLink(value)
-
-/** @param {API.BatcherShardEntry<any>[]} entries */
+/** @param {API.BatcherShardEntry[]} entries */
 const asShardEntries = entries => /** @type {API.ShardEntry[]} */ (entries)
 
-/** @param {API.BatcherShardEntry<any>} entry */
+/** @param {API.BatcherShardEntry} entry */
 const asShardEntry = entry => /** @type {API.ShardEntry} */ (entry)
-
-/**
- * @template {API.BatcherShard} T
- * @param {API.ShardEntry[]} entries
- */
-const asBatcherShardEntries = entries => /** @type {API.BatcherShardEntry<T>[]} */ (entries)
 
 /**
  * @param {API.BlockFetcher} blocks Bucket block storage.
  * @param {API.ShardLink} root CID of the root shard block.
  * @returns {Promise<API.Batcher>}
  */
-export const create = (blocks, root) => {
-  const shards = new ShardFetcher(blocks)
-  return Batcher.create({ shards, link: root, prefix: '' })
-}
+export const create = (blocks, root) => Batcher.create({ blocks, link: root, prefix: '' })

@@ -4,7 +4,8 @@ import { CarWriter } from '@ipld/car'
 import { CID } from 'multiformats/cid'
 import * as raw from 'multiformats/codecs/raw'
 import { sha256 } from 'multiformats/hashes/sha2'
-import { ShardBlock, put } from '../../src/index.js'
+import { put } from '../../src/index.js'
+import { ShardBlock } from '../../src/shard.js'
 import { MemoryBlockstore } from '../../src/block.js'
 
 /** @param {string} str */
@@ -22,7 +23,7 @@ async function main () {
   blocks.putSync(rootblk.cid, rootblk.bytes)
 
   console.time(`put x${words.length}`)
-  /** @type {import('../../src/shard').ShardLink} */
+  /** @type {import('../../src/api.js').ShardLink} */
   let root = rootblk.cid
   for (const [i, word] of words.entries()) {
     const res = await put(blocks, root, word, cids[i])

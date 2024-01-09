@@ -46,11 +46,10 @@ describe('batch', () => {
     const blocks = new Blockstore()
     await blocks.put(root.cid, root.bytes)
 
-    const ops = [
-      { type: 'put', key: 'testymctestface', value: await randomCID() },
-      { type: 'put', key: 'testing123', value: await randomCID() },
-      { type: 'put', key: 'teeests', value: await randomCID() }
-    ]
+    const ops = []
+    for (let i = 0; i < 1000; i++) {
+      ops.push({ type: 'put', key: `test${randomString(10)}`, value: await randomCID() })
+    }
 
     const batcher = await Batch.create(blocks, root.cid)
     for (const op of ops) {

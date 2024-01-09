@@ -7,6 +7,7 @@ import {
   ShardEntryLinkValue,
   ShardEntryLinkAndValueValue,
   ShardConfig,
+  ShardOptions,
   ShardBlockView,
   BlockFetcher
 } from '../api.js'
@@ -20,26 +21,31 @@ export {
   ShardEntryLinkValue,
   ShardEntryLinkAndValueValue,
   ShardConfig,
+  ShardOptions,
   ShardBlockView,
   BlockFetcher
 }
 
-export interface BatcherShard {
+export interface BatcherShard extends ShardConfig {
   base?: ShardBlockView
   prefix: string
-  entries: BatcherShardEntry<this>[]
-  maxKeyLength: number
-  maxSize: number
+  entries: BatcherShardEntry[]
 }
 
-export type BatcherShardEntry<T extends BatcherShard> = [
+export interface BatcherShardInit extends ShardOptions {
+  base?: ShardBlockView
+  prefix?: string
+  entries?: BatcherShardEntry[]
+}
+
+export type BatcherShardEntry = [
   key: string,
-  value: ShardEntryValueValue | ShardEntryLinkValue | ShardEntryLinkAndValueValue | ShardEntryShardValue<T> | ShardEntryShardAndValueValue<T>
+  value: ShardEntryValueValue | ShardEntryLinkValue | ShardEntryLinkAndValueValue | ShardEntryShardValue | ShardEntryShardAndValueValue
 ]
 
-export type ShardEntryShardValue<T> = [T]
+export type ShardEntryShardValue = [BatcherShard]
 
-export type ShardEntryShardAndValueValue<T> = [T, UnknownLink]
+export type ShardEntryShardAndValueValue = [BatcherShard, UnknownLink]
 
 export interface Batcher {
   /**

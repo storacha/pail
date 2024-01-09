@@ -17,7 +17,10 @@
         "dist/src/api.d.ts"
       ],
       "batch": [
-        "dist/src/batch.d.ts"
+        "dist/src/batch/index.d.ts"
+      ],
+      "batch/api": [
+        "dist/src/batch/api.d.ts"
       ],
       "block": [
         "dist/src/block.d.ts"
@@ -35,7 +38,10 @@
         "dist/src/crdt/api.d.ts"
       ],
       "crdt/batch": [
-        "dist/src/crdt/batch.d.ts"
+        "dist/src/crdt/batch/index.d.ts"
+      ],
+      "crdt/batch/api": [
+        "dist/src/crdt/batch/api.d.ts"
       ],
       "diff": [
         "dist/src/diff.d.ts"
@@ -89,8 +95,12 @@
       "import": "./src/crdt/api.js"
     },
     "./crdt/batch": {
-      "types": "./dist/src/crdt/batch.d.ts",
-      "import": "./src/crdt/batch.js"
+      "types": "./dist/src/crdt/batch/index.d.ts",
+      "import": "./src/crdt/batch/index.js"
+    },
+    "./crdt/batch/api": {
+      "types": "./dist/src/crdt/batch/api.d.ts",
+      "import": "./src/crdt/batch/api.js"
     },
     "./diff": {
       "types": "./dist/src/diff.d.ts",
