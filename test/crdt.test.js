@@ -1,8 +1,11 @@
 import { describe, it } from 'mocha'
 import assert from 'node:assert'
-import { advance, vis } from '../src/clock.js'
-import { put, get, root, entries } from '../src/crdt.js'
-import { Blockstore, randomCID } from './helpers.js'
+// eslint-disable-next-line no-unused-vars
+import * as API from '../src/crdt/api.js'
+import { advance, vis } from '../src/clock/index.js'
+import { put, get, root, entries } from '../src/crdt/index.js'
+import * as Batch from '../src/crdt/batch/index.js'
+import { Blockstore, randomCID, randomString } from './helpers.js'
 
 describe('CRDT', () => {
   it('put a value to a new clock', async () => {
@@ -10,10 +13,11 @@ describe('CRDT', () => {
     const alice = new TestPail(blocks, [])
     const key = 'key'
     const value = await randomCID(32)
-    const { event, head } = await alice.putAndVis(key, value)
+    const { event, head } = await alice.put(key, value)
+    await alice.vis()
 
     assert(event)
-    assert.equal(event.value.data.type, 'put')
+    assert(event.value.data.type === 'put')
     assert.equal(event.value.data.key, key)
     assert.equal(event.value.data.value.toString(), value.toString())
     assert.equal(head.length, 1)
@@ -30,10 +34,11 @@ describe('CRDT', () => {
 
     const key1 = 'key1'
     const value1 = await randomCID(32)
-    const result = await alice.putAndVis(key1, value1)
+    const result = await alice.put(key1, value1)
+    await alice.vis()
 
     assert(result.event)
-    assert.equal(result.event.value.data.type, 'put')
+    assert(result.event.value.data.type === 'put')
     assert.equal(result.event.value.data.key, key1)
     assert.equal(result.event.value.data.value.toString(), value1.toString())
     assert.equal(result.head.length, 1)
@@ -46,7 +51,7 @@ describe('CRDT', () => {
     await alice.put('apple', await randomCID(32))
     const bob = new TestPail(blocks, alice.head)
 
-    /** @type {Array<[string, import('../src/link').AnyLink]>} */
+    /** @type {Array<[string, API.UnknownLink]>} */
     const data = [
       ['banana', await randomCID(32)],
       ['kiwi', await randomCID(32)],
@@ -74,7 +79,8 @@ describe('CRDT', () => {
     await alice.advance(bevent1.cid)
     await bob.advance(aevent0.cid)
 
-    const { event: aevent1 } = await alice.putAndVis(data[4][0], data[4][1])
+    const { event: aevent1 } = await alice.put(data[4][0], data[4][1])
+    await alice.vis()
 
     assert(aevent1)
 
@@ -109,7 +115,7 @@ describe('CRDT', () => {
     await alice.put('apple', await randomCID(32))
     const bob = new TestPail(blocks, alice.head)
 
-    /** @type {Array<[string, import('../src/link').AnyLink]>} */
+    /** @type {Array<[string, API.UnknownLink]>} */
     const data = [
       ['banana', await randomCID(32)],
       ['kiwi', await randomCID(32)]
@@ -133,7 +139,7 @@ describe('CRDT', () => {
     await alice.put('apple', await randomCID(32))
     const bob = new TestPail(blocks, alice.head)
 
-    /** @type {Array<[string, import('../src/link').AnyLink]>} */
+    /** @type {Array<[string, API.UnknownLink]>} */
     const data = [
       ['banana', await randomCID(32)],
       ['kiwi', await randomCID(32)]
@@ -175,19 +181,90 @@ describe('CRDT', () => {
   })
 })
 
+describe('CRDT batch', () => {
+  it('error when put after commit', async () => {
+    const blocks = new Blockstore()
+
+    const ops = []
+    for (let i = 0; i < 5; i++) {
+      ops.push({ type: 'put', key: `test${randomString(10)}`, value: await randomCID() })
+    }
+
+    const batch = await Batch.create(blocks, [])
+    for (const op of ops) {
+      await batch.put(op.key, op.value)
+    }
+    await batch.commit()
+    await assert.rejects(batch.put('test', await randomCID()), /batch already committed/)
+  })
+
+  it('error when commit after commit', async () => {
+    const blocks = new Blockstore()
+
+    const ops = []
+    for (let i = 0; i < 5; i++) {
+      ops.push({ type: 'put', key: `test${randomString(10)}`, value: await randomCID() })
+    }
+
+    const batch = await Batch.create(blocks, [])
+    for (const op of ops) {
+      await batch.put(op.key, op.value)
+    }
+    await batch.commit()
+    await assert.rejects(batch.commit(), /batch already committed/)
+  })
+
+  it('linear put with batch', async () => {
+    const blocks = new Blockstore()
+    const alice = new TestPail(blocks, [])
+
+    const key0 = 'test0'
+    const value0 = await randomCID(32)
+    await alice.put(key0, value0)
+
+    const ops = []
+    for (let i = 0; i < 25; i++) {
+      ops.push({ type: 'put', key: `test${randomString(10)}`, value: await randomCID() })
+    }
+
+    await alice.putBatch(ops)
+
+    // put a new value for the first batch key
+    const key1 = ops[0].key
+    const value1 = await randomCID(32)
+    await alice.put(key1, value1)
+
+    await alice.vis()
+
+    const res0 = await alice.get(key0)
+    assert(res0)
+    assert.equal(res0.toString(), value0.toString())
+
+    for (const op of ops.slice(1)) {
+      const res = await alice.get(op.key)
+      assert(res)
+      assert.equal(res.toString(), op.value.toString())
+    }
+
+    const res1 = await alice.get(key1)
+    assert(res1)
+    assert.equal(res1.toString(), value1.toString())
+  })
+})
+
 class TestPail {
   /**
    * @param {Blockstore} blocks
-   * @param {import('../src/clock').EventLink<import('../src/crdt').EventData>[]} head
+   * @param {API.EventLink<API.Operation>[]} head
    */
   constructor (blocks, head) {
     this.blocks = blocks
     this.head = head
-    /** @type {import('../src/shard.js').ShardLink?} */
+    /** @type {API.ShardLink?} */
     this.root = null
   }
 
-  /** @param {import('../src/clock').EventLink<import('../src/crdt').EventData>} event */
+  /** @param {API.EventLink<API.Operation>} event */
   async advance (event) {
     this.head = await advance(this.blocks, this.head, event)
     const result = await root(this.blocks, this.head)
@@ -198,7 +275,7 @@ class TestPail {
 
   /**
    * @param {string} key
-   * @param {import('../src/link').AnyLink} value
+   * @param {API.UnknownLink} value
    */
   async put (key, value) {
     const result = await put(this.blocks, this.head, key, value)
@@ -210,23 +287,35 @@ class TestPail {
   }
 
   /**
-   * @param {string} key
-   * @param {import('../src/link').AnyLink} value
+   * @param {Array<{ key: string, value: API.UnknownLink }>} items
    */
-  async putAndVis (key, value) {
-    const result = await this.put(key, value)
-    /** @param {import('../src/link').AnyLink} l */
-    const shortLink = l => `${String(l).slice(0, 4)}..${String(l).slice(-4)}`
-    /** @type {(e: import('../src/clock').EventBlockView<import('../src/crdt').EventData>) => string} */
-    const renderNodeLabel = event => {
-      return event.value.data.type === 'put'
-        ? `${shortLink(event.cid)}\\nput(${event.value.data.key}, ${shortLink(event.value.data.value)})`
-        : `${shortLink(event.cid)}\\ndel(${event.value.data.key})`
+  async putBatch (items) {
+    const batch = await Batch.create(this.blocks, this.head)
+    for (const { key, value } of items) {
+      await batch.put(key, value)
     }
-    for await (const line of vis(this.blocks, result.head, { renderNodeLabel })) {
+    const result = await batch.commit()
+    if (result.event) this.blocks.putSync(result.event.cid, result.event.bytes)
+    result.additions.forEach(a => this.blocks.putSync(a.cid, a.bytes))
+    this.head = result.head
+    this.root = (await root(this.blocks, this.head)).root
+    return result
+  }
+
+  async vis () {
+    /** @param {API.UnknownLink} l */
+    const shortLink = l => `${String(l).slice(0, 4)}..${String(l).slice(-4)}`
+    /** @param {API.PutOperation|API.DeleteOperation|API.BatchOperation} o */
+    const renderOp = o => o.type === 'batch'
+      ? `${o.ops.slice(0, 10).map(renderOp).join('\\n')}${o.ops.length > 10 ? `\\n...${o.ops.length - 10} more` : ''}`
+      : `${o.type}(${o.key}${o.type === 'put'
+        ? `, ${shortLink(o.value)}`
+        : ''})`
+    /** @type {(e: API.EventBlockView<API.Operation>) => string} */
+    const renderNodeLabel = event => `${shortLink(event.cid)}\\n${renderOp(event.value.data)}`
+    for await (const line of vis(this.blocks, this.head, { renderNodeLabel })) {
       console.log(line)
     }
-    return result
   }
 
   /** @param {string} key */

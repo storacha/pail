@@ -13,14 +13,35 @@
       "dist/src/index.d.ts": [
         "dist/src/index.d.ts"
       ],
+      "api": [
+        "dist/src/api.d.ts"
+      ],
+      "batch": [
+        "dist/src/batch/index.d.ts"
+      ],
+      "batch/api": [
+        "dist/src/batch/api.d.ts"
+      ],
       "block": [
         "dist/src/block.d.ts"
       ],
       "clock": [
-        "dist/src/clock.d.ts"
+        "dist/src/clock/index.d.ts"
+      ],
+      "clock/api": [
+        "dist/src/clock/api.d.ts"
       ],
       "crdt": [
-        "dist/src/crdt.d.ts"
+        "dist/src/crdt/index.d.ts"
+      ],
+      "crdt/api": [
+        "dist/src/crdt/api.d.ts"
+      ],
+      "crdt/batch": [
+        "dist/src/crdt/batch/index.d.ts"
+      ],
+      "crdt/batch/api": [
+        "dist/src/crdt/batch/api.d.ts"
       ],
       "diff": [
         "dist/src/diff.d.ts"
@@ -41,17 +62,45 @@
       "types": "./dist/src/index.d.ts",
       "import": "./src/index.js"
     },
+    "./api": {
+      "types": "./dist/src/api.d.ts",
+      "import": "./src/api.js"
+    },
+    "./batch": {
+      "types": "./dist/src/batch/index.d.ts",
+      "import": "./src/batch/index.js"
+    },
+    "./batch/api": {
+      "types": "./dist/src/batch/api.d.ts",
+      "import": "./src/batch/api.js"
+    },
     "./block": {
       "types": "./dist/src/block.d.ts",
       "import": "./src/block.js"
     },
     "./clock": {
-      "types": "./dist/src/clock.d.ts",
-      "import": "./src/clock.js"
+      "types": "./dist/src/clock/index.d.ts",
+      "import": "./src/clock/index.js"
+    },
+    "./clock/api": {
+      "types": "./dist/src/clock/api.d.ts",
+      "import": "./src/clock/api.js"
     },
     "./crdt": {
-      "types": "./dist/src/crdt.d.ts",
-      "import": "./src/crdt.js"
+      "types": "./dist/src/crdt/index.d.ts",
+      "import": "./src/crdt/index.js"
+    },
+    "./crdt/api": {
+      "types": "./dist/src/crdt/api.d.ts",
+      "import": "./src/crdt/api.js"
+    },
+    "./crdt/batch": {
+      "types": "./dist/src/crdt/batch/index.d.ts",
+      "import": "./src/crdt/batch/index.js"
+    },
+    "./crdt/batch/api": {
+      "types": "./dist/src/crdt/batch/api.d.ts",
+      "import": "./src/crdt/batch/api.js"
     },
     "./diff": {
       "types": "./dist/src/diff.d.ts",
@@ -94,11 +143,11 @@
     "dist"
   ],
   "dependencies": {
-    "@ipld/car": "^5.0.1",
-    "@ipld/dag-cbor": "^9.0.0",
+    "@ipld/car": "^5.2.4",
+    "@ipld/dag-cbor": "^9.0.6",
     "archy": "^1.0.0",
     "cli-color": "^2.0.3",
-    "multiformats": "^12.1.1",
+    "multiformats": "^12.1.3",
     "sade": "^1.8.1"
   },
   "devDependencies": {

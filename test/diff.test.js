@@ -1,6 +1,9 @@
 import { describe, it } from 'mocha'
 import assert from 'node:assert'
-import { ShardBlock, put } from '../src/index.js'
+// eslint-disable-next-line no-unused-vars
+import * as API from '../src/api.js'
+import { put } from '../src/index.js'
+import { ShardBlock } from '../src/shard.js'
 import { difference } from '../src/diff.js'
 import { Blockstore, randomCID } from './helpers.js'
 
@@ -10,12 +13,12 @@ describe('diff', () => {
     const blocks = new Blockstore()
     await blocks.put(empty.cid, empty.bytes)
 
-    /** @type {Array<[string, import('../src/link').AnyLink]>} */
+    /** @type {Array<[string, API.UnknownLink]>} */
     const testdata = [
       ['a', await randomCID(32)]
     ]
 
-    /** @type {import('../src/shard').ShardLink} */
+    /** @type {API.ShardLink} */
     let root = empty.cid
     for (const [k, v] of testdata) {
       const res = await put(blocks, root, k, v)

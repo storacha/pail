@@ -1,6 +1,6 @@
 // eslint-disable-next-line no-unused-vars
 import * as API from '../src/api.js'
-import { put } from '../src/index.js'
+import * as Batch from '../src/batch/index.js'
 import { ShardBlock } from '../src/shard.js'
 import { MemoryBlockstore } from '../src/block.js'
 import { randomCID, randomString, randomInteger } from '../test/helpers.js'
@@ -25,20 +25,19 @@ async function main () {
 
   console.log('bench')
   console.time(`put x${NUM}`)
-  /** @type {API.ShardLink} */
-  let root = rootBlock.cid
+  const batch = await Batch.create(blocks, rootBlock.cid)
   for (let i = 0; i < kvs.length; i++) {
-    const result = await put(blocks, root, kvs[i][0], kvs[i][1])
-    for (const b of result.additions) {
-      blocks.putSync(b.cid, b.bytes)
-    }
-    for (const b of result.removals) {
-      blocks.deleteSync(b.cid)
-    }
-    root = result.root
+    await batch.put(kvs[i][0], kvs[i][1])
     if (i % 1000 === 0) {
       process.stdout.write('.')
     }
+  }
+  const result = await batch.commit()
+  for (const b of result.additions) {
+    blocks.putSync(b.cid, b.bytes)
+  }
+  for (const b of result.removals) {
+    blocks.deleteSync(b.cid)
   }
   console.log('')
   console.timeEnd(`put x${NUM}`)

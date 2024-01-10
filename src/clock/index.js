@@ -1,31 +1,18 @@
 import { Block, encode, decode } from 'multiformats/block'
 import { sha256 } from 'multiformats/hashes/sha2'
 import * as cbor from '@ipld/dag-cbor'
-
-/**
- * @template T
- * @typedef {{ parents: EventLink<T>[], data: T }} EventView
- */
-
-/**
- * @template T
- * @typedef {import('multiformats').BlockView<EventView<T>>} EventBlockView
- */
-
-/**
- * @template T
- * @typedef {import('multiformats').Link<EventView<T>>} EventLink
- */
+// eslint-disable-next-line no-unused-vars
+import * as API from './api.js'
 
 /**
  * Advance the clock by adding an event.
  *
  * @template T
- * @param {import('./block').BlockFetcher} blocks Block storage.
- * @param {EventLink<T>[]} head The head of the clock.
- * @param {EventLink<T>} event The event to add.
+ * @param {API.BlockFetcher} blocks Block storage.
+ * @param {API.EventLink<T>[]} head The head of the clock.
+ * @param {API.EventLink<T>} event The event to add.
  */
-export async function advance (blocks, head, event) {
+export const advance = async (blocks, head, event) => {
   const events = new EventFetcher(blocks)
   const headmap = new Map(head.map(cid => [cid.toString(), cid]))
   if (headmap.has(event.toString())) return head
@@ -55,13 +42,13 @@ export async function advance (blocks, head, event) {
 
 /**
  * @template T
- * @extends {Block<EventView<T>, typeof cbor.code, typeof sha256.code, 1>}
- * @implements {EventBlockView<T>}
+ * @extends {Block<API.EventView<T>, typeof cbor.code, typeof sha256.code, 1>}
+ * @implements {API.EventBlockView<T>}
  */
 export class EventBlock extends Block {
   /**
    * @param {object} config
-   * @param {EventLink<T>} config.cid
+   * @param {API.EventLink<T>} config.cid
    * @param {Event} config.value
    * @param {Uint8Array} config.bytes
    * @param {string} config.prefix
@@ -75,7 +62,7 @@ export class EventBlock extends Block {
   /**
    * @template T
    * @param {T} data
-   * @param {EventLink<T>[]} [parents]
+   * @param {API.EventLink<T>[]} [parents]
    */
   static create (data, parents) {
     return encodeEventBlock({ data, parents: parents ?? [] })
@@ -84,15 +71,15 @@ export class EventBlock extends Block {
 
 /** @template T */
 export class EventFetcher {
-  /** @param {import('./block').BlockFetcher} blocks */
+  /** @param {API.BlockFetcher} blocks */
   constructor (blocks) {
     /** @private */
     this._blocks = blocks
   }
 
   /**
-   * @param {EventLink<T>} link
-   * @returns {Promise<EventBlockView<T>>}
+   * @param {API.EventLink<T>} link
+   * @returns {Promise<API.EventBlockView<T>>}
    */
   async get (link) {
     const block = await this._blocks.get(link)
@@ -103,10 +90,10 @@ export class EventFetcher {
 
 /**
  * @template T
- * @param {EventView<T>} value
- * @returns {Promise<EventBlockView<T>>}
+ * @param {API.EventView<T>} value
+ * @returns {Promise<API.EventBlockView<T>>}
  */
-export async function encodeEventBlock (value) {
+export const encodeEventBlock = async (value) => {
   // TODO: sort parents
   const { cid, bytes } = await encode({ value, codec: cbor, hasher: sha256 })
   // @ts-expect-error
@@ -116,9 +103,9 @@ export async function encodeEventBlock (value) {
 /**
  * @template T
  * @param {Uint8Array} bytes
- * @returns {Promise<EventBlockView<T>>}
+ * @returns {Promise<API.EventBlockView<T>>}
  */
-export async function decodeEventBlock (bytes) {
+export const decodeEventBlock = async (bytes) => {
   const { cid, value } = await decode({ bytes, codec: cbor, hasher: sha256 })
   // @ts-expect-error
   return new Block({ cid, value, bytes })
@@ -128,10 +115,10 @@ export async function decodeEventBlock (bytes) {
  * Returns true if event "a" contains event "b". Breadth first search.
  * @template T
  * @param {EventFetcher<T>} events
- * @param {EventLink<T>} a
- * @param {EventLink<T>} b
+ * @param {API.EventLink<T>} a
+ * @param {API.EventLink<T>} b
  */
-async function contains (events, a, b) {
+const contains = async (events, a, b) => {
   if (a.toString() === b.toString()) return true
   const [{ value: aevent }, { value: bevent }] = await Promise.all([events.get(a), events.get(b)])
   const links = [...aevent.parents]
@@ -150,18 +137,18 @@ async function contains (events, a, b) {
 
 /**
  * @template T
- * @param {import('./block').BlockFetcher} blocks Block storage.
- * @param {EventLink<T>[]} head
+ * @param {API.BlockFetcher} blocks Block storage.
+ * @param {API.EventLink<T>[]} head
  * @param {object} [options]
- * @param {(b: EventBlockView<T>) => string} [options.renderNodeLabel]
+ * @param {(b: API.EventBlockView<T>) => string} [options.renderNodeLabel]
  */
-export async function * vis (blocks, head, options = {}) {
+export const vis = async function * (blocks, head, options = {}) {
   const renderNodeLabel = options.renderNodeLabel ?? (b => shortLink(b.cid))
   const events = new EventFetcher(blocks)
   yield 'digraph clock {'
   yield '  node [shape=point fontname="Courier"]; head;'
   const hevents = await Promise.all(head.map(link => events.get(link)))
-  /** @type {import('multiformats').Link<EventView<any>>[]} */
+  /** @type {import('multiformats').Link<API.EventView<any>>[]} */
   const links = []
   const nodes = new Set()
   for (const e of hevents) {
@@ -188,5 +175,5 @@ export async function * vis (blocks, head, options = {}) {
   yield '}'
 }
 
-/** @param {import('./link').AnyLink} l */
+/** @param {import('multiformats').UnknownLink} l */
 const shortLink = l => `${String(l).slice(0, 4)}..${String(l).slice(-4)}`

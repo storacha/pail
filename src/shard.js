@@ -1,28 +1,26 @@
+import * as Link from 'multiformats/link'
 import { Block, encode, decode } from 'multiformats/block'
 import { sha256 } from 'multiformats/hashes/sha2'
-import * as cbor from '@ipld/dag-cbor'
+import * as dagCBOR from '@ipld/dag-cbor'
+import { tokensToLength } from 'cborg/length'
+import { Token, Type } from 'cborg'
+// eslint-disable-next-line no-unused-vars
+import * as API from './api.js'
+
+export const MaxKeyLength = 64
+export const MaxShardSize = 512 * 1024
+
+const CID_TAG = new Token(Type.tag, 42)
 
 /**
- * @typedef {import('./link').AnyLink} ShardEntryValueValue
- * @typedef {[ShardLink]} ShardEntryLinkValue
- * @typedef {[ShardLink, import('./link').AnyLink]} ShardEntryLinkAndValueValue
- * @typedef {[key: string, value: ShardEntryValueValue]} ShardValueEntry
- * @typedef {[key: string, value: ShardEntryLinkValue | ShardEntryLinkAndValueValue]} ShardLinkEntry
- * @typedef {[key: string, value: ShardEntryValueValue | ShardEntryLinkValue | ShardEntryLinkAndValueValue]} ShardEntry
- * @typedef {ShardEntry[]} Shard
- * @typedef {import('multiformats').Link<Shard, typeof cbor.code, typeof sha256.code, 1>} ShardLink
- * @typedef {import('multiformats').BlockView<Shard, typeof cbor.code, typeof sha256.code, 1> & { prefix: string }} ShardBlockView
- */
-
-/**
- * @extends {Block<Shard, typeof cbor.code, typeof sha256.code, 1>}
- * @implements {ShardBlockView}
+ * @extends {Block<API.Shard, typeof dagCBOR.code, typeof sha256.code, 1>}
+ * @implements {API.ShardBlockView}
  */
 export class ShardBlock extends Block {
   /**
    * @param {object} config
-   * @param {ShardLink} config.cid
-   * @param {Shard} config.value
+   * @param {API.ShardLink} config.cid
+   * @param {API.Shard} config.value
    * @param {Uint8Array} config.bytes
    * @param {string} config.prefix
    */
@@ -32,21 +30,44 @@ export class ShardBlock extends Block {
     this.prefix = prefix
   }
 
-  static create () {
-    return encodeShardBlock([])
+  /** @param {API.ShardOptions} [options] */
+  static create (options) {
+    return encodeBlock(create(options))
   }
 }
 
-/** @type {WeakMap<Uint8Array, ShardBlockView>} */
+/**
+ * @param {API.ShardOptions} [options]
+ * @returns {API.Shard}
+ */
+export const create = (options) => ({ entries: [], ...configure(options) })
+
+/**
+ * @param {API.ShardOptions} [options]
+ * @returns {API.ShardConfig}
+ */
+export const configure = (options) => ({
+  maxSize: options?.maxSize ?? MaxShardSize,
+  maxKeyLength: options?.maxKeyLength ?? MaxKeyLength
+})
+
+/**
+ * @param {API.ShardEntry[]} entries
+ * @param {API.ShardOptions} [options]
+ * @returns {API.Shard}
+ */
+export const withEntries = (entries, options) => ({ ...create(options), entries })
+
+/** @type {WeakMap<Uint8Array, API.ShardBlockView>} */
 const decodeCache = new WeakMap()
 
 /**
- * @param {Shard} value
+ * @param {API.Shard} value
  * @param {string} [prefix]
- * @returns {Promise<ShardBlockView>}
+ * @returns {Promise<API.ShardBlockView>}
  */
-export async function encodeShardBlock (value, prefix) {
-  const { cid, bytes } = await encode({ value, codec: cbor, hasher: sha256 })
+export const encodeBlock = async (value, prefix) => {
+  const { cid, bytes } = await encode({ value, codec: dagCBOR, hasher: sha256 })
   const block = new ShardBlock({ cid, value, bytes, prefix: prefix ?? '' })
   decodeCache.set(block.bytes, block)
   return block
@@ -55,115 +76,173 @@ export async function encodeShardBlock (value, prefix) {
 /**
  * @param {Uint8Array} bytes
  * @param {string} [prefix]
- * @returns {Promise<ShardBlockView>}
+ * @returns {Promise<API.ShardBlockView>}
  */
-export async function decodeShardBlock (bytes, prefix) {
+export const decodeBlock = async (bytes, prefix) => {
   const block = decodeCache.get(bytes)
   if (block) return block
-  const { cid, value } = await decode({ bytes, codec: cbor, hasher: sha256 })
-  if (!Array.isArray(value)) throw new Error(`invalid shard: ${cid}`)
+  const { cid, value } = await decode({ bytes, codec: dagCBOR, hasher: sha256 })
+  if (!isShard(value)) throw new Error(`invalid shard: ${cid}`)
   return new ShardBlock({ cid, value, bytes, prefix: prefix ?? '' })
 }
 
+/**
+ * @param {any} value
+ * @returns {value is API.Shard}
+ */
+export const isShard = (value) =>
+  value != null &&
+  typeof value === 'object' &&
+  Array.isArray(value.entries) &&
+  typeof value.maxSize === 'number' &&
+  typeof value.maxKeyLength === 'number'
+
+/**
+ * @param {any} value
+ * @returns {value is API.ShardLink}
+ */
+export const isShardLink = (value) =>
+  Link.isLink(value) &&
+  value.code === dagCBOR.code
+
 export class ShardFetcher {
-  /** @param {import('./block').BlockFetcher} blocks */
+  /** @param {API.BlockFetcher} blocks */
   constructor (blocks) {
     this._blocks = blocks
   }
 
   /**
-   * @param {ShardLink} link
+   * @param {API.ShardLink} link
    * @param {string} [prefix]
-   * @returns {Promise<ShardBlockView>}
+   * @returns {Promise<API.ShardBlockView>}
    */
   async get (link, prefix = '') {
     const block = await this._blocks.get(link)
     if (!block) throw new Error(`missing block: ${link}`)
-    return decodeShardBlock(block.bytes, prefix)
+    return decodeBlock(block.bytes, prefix)
   }
 }
 
 /**
- * @param {Shard} target Shard to put to.
- * @param {ShardEntry} entry
- * @returns {Shard}
+ * @param {API.ShardEntry[]} target Entries to insert into.
+ * @param {API.ShardEntry} newEntry
+ * @returns {API.ShardEntry[]}
  */
-export function putEntry (target, entry) {
-  if (!target.length) return [entry]
+export const putEntry = (target, newEntry) => {
+  /** @type {API.ShardEntry[]} */
+  const entries = []
 
-  /** @type {Shard} */
-  const shard = []
-  for (const [i, [k, v]] of target.entries()) {
-    if (entry[0] === k) {
+  for (const [i, entry] of target.entries()) {
+    const [k, v] = entry
+    if (newEntry[0] === k) {
       // if new value is link to shard...
-      if (Array.isArray(entry[1])) {
+      if (Array.isArray(newEntry[1])) {
         // and old value is link to shard
         // and old value is _also_ link to data
         // and new value does not have link to data
         // then preserve old data
-        if (Array.isArray(v) && v[1] != null && entry[1][1] == null) {
-          shard.push([k, [entry[1][0], v[1]]])
+        if (Array.isArray(v) && v[1] != null && newEntry[1][1] == null) {
+          entries.push([k, [newEntry[1][0], v[1]]])
         } else {
-          shard.push(entry)
+          entries.push(newEntry)
         }
       } else {
         // shard as well as value?
-        /** @type {ShardEntry} */
-        const newEntry = Array.isArray(v) ? [k, [v[0], entry[1]]] : entry
-        shard.push(newEntry)
+        if (Array.isArray(v)) {
+          entries.push([k, [v[0], newEntry[1]]])
+        } else {
+          entries.push(newEntry)
+        }
       }
       for (let j = i + 1; j < target.length; j++) {
-        shard.push(target[j])
+        entries.push(target[j])
       }
-      return shard
+      return entries
     }
-    if (i === 0 && entry[0] < k) {
-      shard.push(entry)
+    if (i === 0 && newEntry[0] < k) {
+      entries.push(newEntry)
       for (let j = i; j < target.length; j++) {
-        shard.push(target[j])
+        entries.push(target[j])
       }
-      return shard
+      return entries
     }
-    if (i > 0 && entry[0] > target[i - 1][0] && entry[0] < k) {
-      shard.push(entry)
+    if (i > 0 && newEntry[0] > target[i - 1][0] && newEntry[0] < k) {
+      entries.push(newEntry)
       for (let j = i; j < target.length; j++) {
-        shard.push(target[j])
+        entries.push(target[j])
       }
-      return shard
+      return entries
     }
-    shard.push([k, v])
+    entries.push(entry)
   }
 
-  shard.push(entry)
-  return shard
+  entries.push(newEntry)
+  return entries
 }
 
 /**
- * @param {import('./shard').Shard} shard
+ * @param {API.ShardEntry[]} entries
  * @param {string} skey Shard key to use as a base.
  */
-export function findCommonPrefix (shard, skey) {
-  const startidx = shard.findIndex(([k]) => skey === k)
+export const findCommonPrefix = (entries, skey) => {
+  const startidx = entries.findIndex(([k]) => skey === k)
   if (startidx === -1) throw new Error(`key not found in shard: ${skey}`)
   let i = startidx
   /** @type {string} */
   let pfx
   while (true) {
-    pfx = shard[i][0].slice(0, -1)
+    pfx = entries[i][0].slice(0, -1)
     if (pfx.length) {
       while (true) {
-        const matches = shard.filter(entry => entry[0].startsWith(pfx))
+        const matches = entries.filter(entry => entry[0].startsWith(pfx))
         if (matches.length > 1) return { prefix: pfx, matches }
         pfx = pfx.slice(0, -1)
         if (!pfx.length) break
       }
     }
     i++
-    if (i >= shard.length) {
+    if (i >= entries.length) {
       i = 0
     }
     if (i === startidx) {
       return
     }
   }
+}
+
+/** @param {API.Shard} shard */
+export const encodedLength = (shard) => {
+  let entriesLength = 0
+  for (const entry of shard.entries) {
+    entriesLength += entryEncodedLength(entry)
+  }
+  const tokens = [
+    new Token(Type.map, 3),
+    new Token(Type.string, 'entries'),
+    new Token(Type.array, shard.entries.length),
+    new Token(Type.string, 'maxKeyLength'),
+    new Token(Type.uint, shard.maxKeyLength),
+    new Token(Type.string, 'maxSize'),
+    new Token(Type.uint, shard.maxSize)
+  ]
+  return tokensToLength(tokens) + entriesLength
+}
+
+/** @param {API.ShardEntry} entry */
+const entryEncodedLength = entry => {
+  const tokens = [
+    new Token(Type.array, entry.length),
+    new Token(Type.string, entry[0])
+  ]
+  if (Array.isArray(entry[1])) {
+    tokens.push(new Token(Type.array, entry[1].length))
+    for (const link of entry[1]) {
+      tokens.push(CID_TAG)
+      tokens.push(new Token(Type.bytes, { length: link.byteLength + 1 }))
+    }
+  } else {
+    tokens.push(CID_TAG)
+    tokens.push(new Token(Type.bytes, { length: entry[1].byteLength + 1 }))
+  }
+  return tokensToLength(tokens)
 }

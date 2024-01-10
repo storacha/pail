@@ -1,17 +1,19 @@
+// eslint-disable-next-line no-unused-vars
+import * as API from './api.js'
 import { difference } from './diff.js'
 import { put, del } from './index.js'
 
 /**
- * @param {import('./block').BlockFetcher} blocks Bucket block storage.
- * @param {import('./shard').ShardLink} base Merge base. Common parent of target DAGs.
- * @param {import('./shard').ShardLink[]} targets Target DAGs to merge.
- * @returns {Promise<{ root: import('./shard').ShardLink } & import('./index').ShardDiff>}
+ * @param {API.BlockFetcher} blocks Bucket block storage.
+ * @param {API.ShardLink} base Merge base. Common parent of target DAGs.
+ * @param {API.ShardLink[]} targets Target DAGs to merge.
+ * @returns {Promise<{ root: API.ShardLink } & API.ShardDiff>}
  */
 export async function merge (blocks, base, targets) {
   const diffs = await Promise.all(targets.map(t => difference(blocks, base, t)))
   const additions = new Map()
   const removals = new Map()
-  /** @type {import('./block').BlockFetcher} */
+  /** @type {API.BlockFetcher} */
   const fetcher = { get: cid => additions.get(cid.toString()) ?? blocks.get(cid) }
 
   let root = base
