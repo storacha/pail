@@ -1,6 +1,6 @@
 # pail
 
-[![Test](https://github.com/alanshaw/pail/actions/workflows/test.yml/badge.svg)](https://github.com/alanshaw/pail/actions/workflows/test.yml)
+[![Test](https://github.com/web3-storage/pail/actions/workflows/ci.yml/badge.svg)](https://github.com/web3-storage/pail/actions/workflows/ci.yml)
 [![JavaScript Style Guide](https://img.shields.io/badge/code_style-standard-brightgreen.svg)](https://standardjs.com)
 
 DAG based key value store. Sharded DAG that minimises traversals and work to build shards.
@@ -11,15 +11,15 @@ DAG based key value store. Sharded DAG that minimises traversals and work to bui
 ## Install
 
 ```
-npm install @alanshaw/pail
+npm install @web3-storage/pail
 ```
 
 ## Usage
 
 ```js
-import { put, get, del } from '@alanshaw/pail'
-import { ShardBlock } from '@alanshaw/pail/shard'
-import { MemoryBlockstore } from '@alanshaw/pail/block'
+import { put, get, del } from '@web3-storage/pail'
+import { ShardBlock } from '@web3-storage/pail/shard'
+import { MemoryBlockstore } from '@web3-storage/pail/block'
 
 // Initialize a new bucket
 const blocks = new MemoryBlockstore()
@@ -45,10 +45,10 @@ for (const block of removals) {
 If adding many multiple items to the pail together, it is faster to batch them together.
 
 ```js
-import { put, get, del } from '@alanshaw/pail'
-import { ShardBlock } from '@alanshaw/pail/shard'
-import { MemoryBlockstore } from '@alanshaw/pail/block'
-import * as Batch from '@alanshaw/pail/batch'
+import { put, get, del } from '@web3-storage/pail'
+import { ShardBlock } from '@web3-storage/pail/shard'
+import { MemoryBlockstore } from '@web3-storage/pail/block'
+import * as Batch from '@web3-storage/pail/batch'
 
 // Initialize a new bucket
 const blocks = new MemoryBlockstore()
@@ -77,8 +77,8 @@ for (const block of removals) {
 
 ## Contributing
 
-Feel free to join in. All welcome. [Open an issue](https://github.com/alanshaw/pail/issues)!
+Feel free to join in. All welcome. [Open an issue](https://github.com/web3-storage/pail/issues)!
 
 ## License
 
-Dual-licensed under [MIT or Apache 2.0](https://github.com/alanshaw/pail/blob/main/LICENSE.md)
+Dual-licensed under [MIT or Apache 2.0](https://github.com/web3-storage/pail/blob/main/LICENSE.md)

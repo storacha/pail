@@ -1,6 +1,6 @@
 {
-  "name": "@alanshaw/pail",
-  "version": "0.3.4",
+  "name": "@web3-storage/pail",
+  "version": "1.0.0",
   "description": "DAG based key value store.",
   "main": "src/index.js",
   "type": "module",
@@ -159,12 +159,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/alanshaw/pail.git"
+    "url": "git+https://github.com/web3-storage/pail.git"
   },
   "bugs": {
-    "url": "https://github.com/alanshaw/pail/issues"
+    "url": "https://github.com/web3-storage/pail/issues"
   },
-  "homepage": "https://github.com/alanshaw/pail#readme",
+  "homepage": "https://github.com/web3-storage/pail#readme",
   "standard": {
     "ignore": [
       "*.ts"

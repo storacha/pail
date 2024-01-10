@@ -1,0 +1,39 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: google-github-actions/release-please-action@v3
+        id: release
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          release-type: node
+          bump-minor-pre-major: true
+      - uses: actions/checkout@v2
+        if: ${{ steps.release.outputs.release_created }}
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 'latest'
+        if: ${{ steps.release.outputs.release_created }}
+      - uses: actions/setup-node@v2
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org/
+          cache: 'pnpm'
+        if: ${{ steps.release.outputs.release_created }}
+      - name: Install dependencies
+        run: pnpm install
+        if: ${{ steps.release.outputs.release_created }}
+      - name: Publish
+        run: pnpm publish --access=public
+        env:
+          NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
+        if: ${{ steps.release.outputs.release_created }}
