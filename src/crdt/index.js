@@ -302,6 +302,10 @@ const findCommonString = (arrays) => {
  * @param {API.EventLink<API.Operation>} tail
  */
 const findSortedEvents = async (events, head, tail) => {
+  if (head.length === 1 && head[0].toString() === tail.toString()) {
+    return []
+  }
+
   // get weighted events - heavier events happened first
   /** @type {Map<string, { event: API.EventBlockView<API.Operation>, weight: number }>} */
   const weights = new Map()
