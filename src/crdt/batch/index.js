@@ -9,7 +9,9 @@ import * as Clock from '../../clock/index.js'
 import { EventBlock } from '../../clock/index.js'
 import { MemoryBlockstore, MultiBlockFetcher } from '../../block.js'
 
-/** @implements {API.Batcher} */
+export { BatchCommittedError }
+
+/** @implements {API.CRDTBatcher} */
 class Batcher {
   #committed = false
 
@@ -59,7 +61,12 @@ class Batcher {
     /** @type {API.Operation} */
     const data = { type: 'batch', ops: this.ops, root: res.root }
     const event = await EventBlock.create(data, this.head)
-    const head = await Clock.advance(this.blocks, this.head, event.cid)
+
+    const mblocks = new MemoryBlockstore()
+    const blocks = new MultiBlockFetcher(mblocks, this.blocks)
+    mblocks.putSync(event.cid, event.bytes)
+
+    const head = await Clock.advance(blocks, this.head, event.cid)
 
     /** @type {Map<string, API.ShardBlockView>} */
     const additions = new Map()
@@ -126,6 +133,6 @@ class Batcher {
 /**
  * @param {API.BlockFetcher} blocks Bucket block storage.
  * @param {API.EventLink<API.Operation>[]} head Merkle clock head.
- * @returns {Promise<API.Batcher>}
+ * @returns {Promise<API.CRDTBatcher>}
  */
 export const create = (blocks, head) => Batcher.create({ blocks, head, prefix: '' })

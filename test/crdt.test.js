@@ -4,7 +4,8 @@ import assert from 'node:assert'
 import * as API from '../src/crdt/api.js'
 import { advance, vis } from '../src/clock/index.js'
 import { put, get, root, entries } from '../src/crdt/index.js'
-import { Blockstore, randomCID } from './helpers.js'
+import * as Batch from '../src/crdt/batch/index.js'
+import { Blockstore, randomCID, randomString } from './helpers.js'
 
 describe('CRDT', () => {
   it('put a value to a new clock', async () => {
@@ -12,7 +13,8 @@ describe('CRDT', () => {
     const alice = new TestPail(blocks, [])
     const key = 'key'
     const value = await randomCID(32)
-    const { event, head } = await alice.putAndVis(key, value)
+    const { event, head } = await alice.put(key, value)
+    await alice.vis()
 
     assert(event)
     assert(event.value.data.type === 'put')
@@ -32,7 +34,8 @@ describe('CRDT', () => {
 
     const key1 = 'key1'
     const value1 = await randomCID(32)
-    const result = await alice.putAndVis(key1, value1)
+    const result = await alice.put(key1, value1)
+    await alice.vis()
 
     assert(result.event)
     assert(result.event.value.data.type === 'put')
@@ -76,7 +79,8 @@ describe('CRDT', () => {
     await alice.advance(bevent1.cid)
     await bob.advance(aevent0.cid)
 
-    const { event: aevent1 } = await alice.putAndVis(data[4][0], data[4][1])
+    const { event: aevent1 } = await alice.put(data[4][0], data[4][1])
+    await alice.vis()
 
     assert(aevent1)
 
@@ -175,6 +179,43 @@ describe('CRDT', () => {
     assert.deepEqual(r1.head.map(cid => cid.toString()), r0.head.map(cid => cid.toString()))
     assert.equal(r1.event, undefined)
   })
+
+  it('linear put with batch', async () => {
+    const blocks = new Blockstore()
+    const alice = new TestPail(blocks, [])
+
+    const key0 = 'test0'
+    const value0 = await randomCID(32)
+    await alice.put(key0, value0)
+
+    const ops = []
+    for (let i = 0; i < 25; i++) {
+      ops.push({ type: 'put', key: `test${randomString(10)}`, value: await randomCID() })
+    }
+
+    await alice.putBatch(ops)
+
+    // put a new value for the first batch key
+    const key1 = ops[0].key
+    const value1 = await randomCID(32)
+    await alice.put(key1, value1)
+
+    await alice.vis()
+
+    const res0 = await alice.get(key0)
+    assert(res0)
+    assert.equal(res0.toString(), value0.toString())
+
+    for (const op of ops.slice(1)) {
+      const res = await alice.get(op.key)
+      assert(res)
+      assert.equal(res.toString(), op.value.toString())
+    }
+
+    const res1 = await alice.get(key1)
+    assert(res1)
+    assert.equal(res1.toString(), value1.toString())
+  })
 })
 
 class TestPail {
@@ -212,29 +253,35 @@ class TestPail {
   }
 
   /**
-   * @param {string} key
-   * @param {API.UnknownLink} value
+   * @param {Array<{ key: string, value: API.UnknownLink }>} items
    */
-  async putAndVis (key, value) {
-    const result = await this.put(key, value)
+  async putBatch (items) {
+    const batch = await Batch.create(this.blocks, this.head)
+    for (const { key, value } of items) {
+      await batch.put(key, value)
+    }
+    const result = await batch.commit()
+    if (result.event) this.blocks.putSync(result.event.cid, result.event.bytes)
+    result.additions.forEach(a => this.blocks.putSync(a.cid, a.bytes))
+    this.head = result.head
+    this.root = (await root(this.blocks, this.head)).root
+    return result
+  }
+
+  async vis () {
     /** @param {API.UnknownLink} l */
     const shortLink = l => `${String(l).slice(0, 4)}..${String(l).slice(-4)}`
-    /** @param {API.PutOperation|API.DeleteOperation} o */
-    const renderOp = o => `${o.type}(${o.key}${o.type === 'put' ? `${shortLink(o.value)}` : ''})`
+    /** @param {API.PutOperation|API.DeleteOperation|API.BatchOperation} o */
+    const renderOp = o => o.type === 'batch'
+      ? `${o.ops.slice(0, 10).map(renderOp).join('\\n')}${o.ops.length > 10 ? `\\n...${o.ops.length - 10} more` : ''}`
+      : `${o.type}(${o.key}${o.type === 'put'
+        ? `, ${shortLink(o.value)}`
+        : ''})`
     /** @type {(e: API.EventBlockView<API.Operation>) => string} */
-    const renderNodeLabel = event => {
-      if (event.value.data.type === 'put' || event.value.data.type === 'del') {
-        return `${shortLink(event.cid)}\\n${renderOp(event.value.data)})`
-      } else if (event.value.data.type === 'batch') {
-        return `${shortLink(event.cid)}\\nbatch(${event.value.data.ops.map(renderOp)})`
-      }
-      // @ts-expect-error
-      throw new Error(`unknown operation: ${event.value.data.type}`)
-    }
-    for await (const line of vis(this.blocks, result.head, { renderNodeLabel })) {
+    const renderNodeLabel = event => `${shortLink(event.cid)}\\n${renderOp(event.value.data)}`
+    for await (const line of vis(this.blocks, this.head, { renderNodeLabel })) {
       console.log(line)
     }
-    return result
   }
 
   /** @param {string} key */

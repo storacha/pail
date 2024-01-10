@@ -3,7 +3,11 @@ import assert from 'node:assert'
 import * as Link from 'multiformats/link'
 import * as raw from 'multiformats/codecs/raw'
 import { sha256 } from 'multiformats/hashes/sha2'
-import { decodeBlock } from '../src/shard.js'
+import clc from 'cli-color'
+import archy from 'archy'
+// eslint-disable-next-line no-unused-vars
+import * as API from '../src/api.js'
+import { ShardFetcher, decodeBlock } from '../src/shard.js'
 import { MemoryBlockstore } from '../src/block.js'
 
 /**
@@ -57,4 +61,38 @@ export class Blockstore extends MemoryBlockstore {
     assert(blk)
     return decodeBlock(blk.bytes, prefix)
   }
+}
+
+/**
+ * @param {API.BlockFetcher} blocks Block storage.
+ * @param {API.ShardLink} root
+ */
+export const vis = async (blocks, root) => {
+  const shards = new ShardFetcher(blocks)
+  const rshard = await shards.get(root)
+
+  /** @type {archy.Data} */
+  const archyRoot = { label: `Shard(${clc.yellow(rshard.cid.toString())}) ${rshard.bytes.length + 'b'}`, nodes: [] }
+
+  /** @param {API.ShardEntry} entry */
+  const getData = async ([k, v]) => {
+    if (!Array.isArray(v)) {
+      return { label: `Key(${clc.magenta(k)})`, nodes: [{ label: `Value(${clc.cyan(v)})` }] }
+    }
+    /** @type {archy.Data} */
+    const data = { label: `Key(${clc.magenta(k)})`, nodes: [] }
+    if (v[1]) data.nodes?.push({ label: `Value(${clc.cyan(v[1])})` })
+    const blk = await shards.get(v[0])
+    data.nodes?.push({
+      label: `Shard(${clc.yellow(v[0])}) ${blk.bytes.length + 'b'}`,
+      nodes: await Promise.all(blk.value.entries.map(e => getData(e)))
+    })
+    return data
+  }
+
+  for (const entry of rshard.value.entries) {
+    archyRoot.nodes?.push(await getData(entry))
+  }
+
+  console.log(archy(archyRoot))
 }

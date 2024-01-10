@@ -4,19 +4,6 @@ import { ShardFetcher } from '../shard.js'
 import * as Shard from '../shard.js'
 import * as BatcherShard from './shard.js'
 
-export const BatchCommittedErrorCode = 'ERR_BATCH_COMMITTED'
-
-export class BatchCommittedError extends Error {
-  /**
-   * @param {string} [message]
-   * @param {ErrorOptions} [options]
-   */
-  constructor (message, options) {
-    super(message ?? 'batch already committed', options)
-    this.code = BatchCommittedErrorCode
-  }
-}
-
 /** @implements {API.Batcher} */
 class Batcher {
   #committed = false
@@ -243,3 +230,16 @@ const asShardEntry = entry => /** @type {API.ShardEntry} */ (entry)
  * @returns {Promise<API.Batcher>}
  */
 export const create = (blocks, root) => Batcher.create({ blocks, link: root, prefix: '' })
+
+export class BatchCommittedError extends Error {
+  /**
+   * @param {string} [message]
+   * @param {ErrorOptions} [options]
+   */
+  constructor (message, options) {
+    super(message ?? 'batch already committed', options)
+    this.code = BatchCommittedError.code
+  }
+
+  static code = 'ERR_BATCH_COMMITTED'
+}

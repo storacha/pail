@@ -142,14 +142,14 @@ export const putEntry = (target, newEntry) => {
         // and new value does not have link to data
         // then preserve old data
         if (Array.isArray(v) && v[1] != null && newEntry[1][1] == null) {
-          entries.push(Object.assign([], entry, newEntry, { 1: [newEntry[1][0], v[1]] }))
+          entries.push([k, [newEntry[1][0], v[1]]])
         } else {
           entries.push(newEntry)
         }
       } else {
         // shard as well as value?
         if (Array.isArray(v)) {
-          entries.push(Object.assign([], entry, newEntry, { 1: [v[0], newEntry[1]] }))
+          entries.push([k, [v[0], newEntry[1]]])
         } else {
           entries.push(newEntry)
         }
