@@ -1,7 +1,7 @@
 // eslint-disable-next-line no-unused-vars
 import * as API from './api.js'
 import * as Shard from '../../shard.js'
-import { ShardFetcher } from '../../shard.js'
+import { ShardFetcher, ShardBlock } from '../../shard.js'
 import * as Batch from '../../batch/index.js'
 import { BatchCommittedError } from '../../batch/index.js'
 import * as CRDT from '../index.js'
@@ -110,10 +110,28 @@ class Batcher {
    * @param {string} init.prefix
    */
   static async create ({ blocks, head, prefix }) {
-    const { root, additions, removals } = await CRDT.root(blocks, head)
-
-    const mblocks = new MemoryBlockstore(additions)
+    const mblocks = new MemoryBlockstore()
     blocks = new MultiBlockFetcher(mblocks, blocks)
+
+    if (!head.length) {
+      const base = await ShardBlock.create()
+      mblocks.putSync(base.cid, base.bytes)
+      return new Batcher({
+        blocks,
+        head,
+        entries: [],
+        prefix,
+        base,
+        additions: [base],
+        removals: [],
+        ...Shard.configure(base.value)
+      })
+    }
+
+    const { root, additions, removals } = await CRDT.root(blocks, head)
+    for (const a of additions) {
+      mblocks.putSync(a.cid, a.bytes)
+    }
 
     const shards = new ShardFetcher(blocks)
     const base = await shards.get(root)

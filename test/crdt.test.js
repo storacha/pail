@@ -179,6 +179,40 @@ describe('CRDT', () => {
     assert.deepEqual(r1.head.map(cid => cid.toString()), r0.head.map(cid => cid.toString()))
     assert.equal(r1.event, undefined)
   })
+})
+
+describe('CRDT batch', () => {
+  it('error when put after commit', async () => {
+    const blocks = new Blockstore()
+
+    const ops = []
+    for (let i = 0; i < 5; i++) {
+      ops.push({ type: 'put', key: `test${randomString(10)}`, value: await randomCID() })
+    }
+
+    const batch = await Batch.create(blocks, [])
+    for (const op of ops) {
+      await batch.put(op.key, op.value)
+    }
+    await batch.commit()
+    await assert.rejects(batch.put('test', await randomCID()), /batch already committed/)
+  })
+
+  it('error when commit after commit', async () => {
+    const blocks = new Blockstore()
+
+    const ops = []
+    for (let i = 0; i < 5; i++) {
+      ops.push({ type: 'put', key: `test${randomString(10)}`, value: await randomCID() })
+    }
+
+    const batch = await Batch.create(blocks, [])
+    for (const op of ops) {
+      await batch.put(op.key, op.value)
+    }
+    await batch.commit()
+    await assert.rejects(batch.commit(), /batch already committed/)
+  })
 
   it('linear put with batch', async () => {
     const blocks = new Blockstore()
