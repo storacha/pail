@@ -48,14 +48,14 @@ If adding many multiple items to the pail together, it is faster to batch them t
 import { put, get, del } from '@alanshaw/pail'
 import { ShardBlock } from '@alanshaw/pail/shard'
 import { MemoryBlockstore } from '@alanshaw/pail/block'
-import * as Batcher from '@alanshaw/pail/batch'
+import * as Batch from '@alanshaw/pail/batch'
 
 // Initialize a new bucket
 const blocks = new MemoryBlockstore()
 const init = await ShardBlock.create() // empty root shard
 await blocks.put(init.cid, init.bytes)
 
-const batch = await Batcher.create(blocks, init.cid)
+const batch = await Batch.create(blocks, init.cid)
 
 // items is an array of `{ key: string, value: CID }` - the items to add to the pail
 for (const item of items) {
