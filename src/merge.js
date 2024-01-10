@@ -9,7 +9,7 @@ import { put, del } from './index.js'
  * @param {API.ShardLink[]} targets Target DAGs to merge.
  * @returns {Promise<{ root: API.ShardLink } & API.ShardDiff>}
  */
-export async function merge (blocks, base, targets) {
+export const merge = async (blocks, base, targets) => {
   const diffs = await Promise.all(targets.map(t => difference(blocks, base, t)))
   const additions = new Map()
   const removals = new Map()

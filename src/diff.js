@@ -18,7 +18,7 @@ import { ShardFetcher } from './shard.js'
  * @param {API.ShardLink} b Comparison DAG.
  * @returns {Promise<CombinedDiff>}
  */
-export async function difference (blocks, a, b, prefix = '') {
+export const difference = async (blocks, a, b, prefix = '') => {
   if (isEqual(a, b)) return { keys: [], shards: { additions: [], removals: [] } }
 
   const shards = new ShardFetcher(blocks)
