@@ -251,7 +251,11 @@ export const entries = async function * (blocks, root, options = {}) {
               continue
             }
           }
-          yield * ents(await shards.get(entry[1][0], key))
+          if (entry[1][0].entries) {
+            yield * ents({ value: entry[1][0] })
+          } else {
+            yield * ents(await shards.get(entry[1][0], key))
+          }
         } else {
           if (prefix && !key.startsWith(prefix)) {
             continue
