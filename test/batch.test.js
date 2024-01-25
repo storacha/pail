@@ -42,7 +42,7 @@ describe('batch', () => {
   })
 
   it('batches puts (shard on max size)', async () => {
-    const rootblk = await ShardBlock.create({ maxSize: 1000 })
+    const rootblk = await ShardBlock.create({ maxSize: 2000 })
     const blocks = new Blockstore()
     await blocks.put(rootblk.cid, rootblk.bytes)
 
@@ -73,7 +73,7 @@ describe('batch', () => {
       assert.equal(value.toString(), o.value.toString())
     }
 
-    // vis(blocks, root)
+    vis(blocks, root)
   })
 
   it('create the same DAG as non-batched puts', async () => {

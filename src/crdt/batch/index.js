@@ -31,7 +31,7 @@ class Batcher {
     this.blocks = blocks
     this.head = head
     this.prefix = prefix
-    this.entries = entries
+    this.entries = [...entries]
     this.base = base
     this.maxSize = maxSize
     this.maxKeyLength = maxKeyLength

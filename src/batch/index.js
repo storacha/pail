@@ -20,7 +20,7 @@ class Batcher {
   constructor ({ blocks, entries, prefix, maxSize, maxKeyLength, base }) {
     this.blocks = blocks
     this.prefix = prefix
-    this.entries = entries
+    this.entries = [...entries]
     this.base = base
     this.maxSize = maxSize
     this.maxKeyLength = maxKeyLength
@@ -51,7 +51,7 @@ class Batcher {
   static async create ({ blocks, link, prefix }) {
     const shards = new ShardFetcher(blocks)
     const base = await shards.get(link)
-    return new Batcher({ blocks, entries: base.value.entries, prefix, base, ...Shard.configure(base.value) })
+    return new Batcher({ blocks, prefix, base, ...base.value })
   }
 }
 
@@ -108,7 +108,7 @@ export const put = async (blocks, shard, key, value) => {
   shard.entries = Shard.putEntry(asShardEntries(shard.entries), asShardEntry(entry))
 
   // TODO: adjust size automatically
-  const size = Shard.encodedLength(Shard.withEntries(asShardEntries(shard.entries), shard))
+  const size = BatcherShard.encodedLength(shard)
   if (size > shard.maxSize) {
     const common = Shard.findCommonPrefix(
       asShardEntries(shard.entries),
@@ -164,13 +164,15 @@ export const put = async (blocks, shard, key, value) => {
  * @returns {Promise<{ shard: API.BatcherShard, key: string }>}
  */
 export const traverse = async (shards, key, shard) => {
-  for (const e of shard.entries) {
-    const [k, v] = e
+  for (let i = 0; i < shard.entries.length; i++) {
+    const [k, v] = shard.entries[i]
     if (key <= k) break
     if (key.startsWith(k) && Array.isArray(v)) {
       if (Shard.isShardLink(v[0])) {
         const blk = await shards.get(v[0], shard.prefix + k)
-        v[0] = BatcherShard.create({ base: blk, prefix: blk.prefix, ...blk.value })
+        const batcher = BatcherShard.create({ base: blk, prefix: blk.prefix, ...blk.value })
+        shard.entries[i] = [k, v[1] == null ? [batcher] : [batcher, v[1]]]
+        return traverse(shards, key.slice(k.length), batcher)
       }
       return traverse(shards, key.slice(k.length), v[0])
     }
