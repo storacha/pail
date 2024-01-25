@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/web3-storage/pail/compare/v0.4.0...v0.4.1) (2024-01-25)
+
+
+### Bug Fixes
+
+* mutated cached block and encoding length for batched shards ([7c327d4](https://github.com/web3-storage/pail/commit/7c327d48ad60038f61336a006289364fda94a40d))
+
 ## [0.4.0](https://github.com/web3-storage/pail/compare/v0.3.4...v0.4.0) (2024-01-10)
 
 
