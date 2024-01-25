@@ -146,6 +146,12 @@ describe('clock', () => {
 
   it('add an old event', async () => {
     const blocks = new Blockstore()
+    const blockGet = blocks.get.bind(blocks)
+    let count = 0
+    blocks.get = async cid => {
+      count++
+      return blockGet(cid)
+    }
     const root = await EventBlock.create(await randomEventData())
     await blocks.put(root.cid, root.bytes)
 
@@ -184,7 +190,9 @@ describe('clock', () => {
     // now very old one
     const event6 = await EventBlock.create(await randomEventData(), parents0)
     await blocks.put(event6.cid, event6.bytes)
+    const before = count
     head = await advance(blocks, head, event6.cid)
+    assert.equal(count - before, 10)
 
     for await (const line of vis(blocks, head)) console.log(line)
     assert.equal(head.length, 2)
