@@ -220,4 +220,64 @@ describe('clock', () => {
     assert.equal(head.length, 1)
     assert.equal(head[0].toString(), event1.cid.toString())
   })
+
+  it('test to compare retrivals',async ()=>
+  {
+    const blocks = new Blockstore()
+    const root = await EventBlock.create(await randomEventData())
+    await blocks.put(root.cid, root.bytes)
+    /** @type {API.EventLink<any>[]} */
+    let head = [root.cid]
+    const parents0 = head
+    const blockGet = blocks.get.bind(blocks)
+    let count = 0
+    blocks.get = async cid => {
+      count++
+      return blockGet(cid)
+    }
+    const event0 = await EventBlock.create(await randomEventData(), parents0)
+    await blocks.put(event0.cid, event0.bytes)
+    head = await advance(blocks, head, event0.cid)
+
+    const event0a = await EventBlock.create(await randomEventData(), [event0.cid])
+    await blocks.put(event0a.cid, event0a.bytes)
+    head = await advance(blocks, head, event0a.cid)
+
+    const event0b = await EventBlock.create(await randomEventData(), [event0a.cid])
+    await blocks.put(event0b.cid, event0b.bytes)
+    head = await advance(blocks, head, event0b.cid)
+    const event0c = await EventBlock.create(await randomEventData(), [event0b.cid])
+    await blocks.put(event0c.cid, event0c.bytes)
+    head = await advance(blocks, head, event0c.cid)
+
+    const event1 = await EventBlock.create(await randomEventData(), [event0c.cid])
+    await blocks.put(event1.cid, event1.bytes)
+    head = await advance(blocks, head, event1.cid)
+
+    const event2 = await EventBlock.create(await randomEventData(), parents0)
+    await blocks.put(event2.cid, event2.bytes)
+    head = await advance(blocks, head, event2.cid)
+
+    const event3 = await EventBlock.create(await randomEventData(), [event0c.cid, event1.cid,event2.cid])
+    await blocks.put(event3.cid, event3.bytes)
+    head = await advance(blocks, head, event3.cid)
+
+    const event4 = await EventBlock.create(await randomEventData(), [event0c.cid,event1.cid])
+    await blocks.put(event4.cid, event4.bytes)
+    head = await advance(blocks, head, event4.cid)
+
+    const event5 = await EventBlock.create(await randomEventData(), [event3.cid,event4.cid])
+    await blocks.put(event5.cid, event5.bytes)
+    head = await advance(blocks, head, event5.cid)
+
+    const event6 = await EventBlock.create(await randomEventData(),parents0)
+    await blocks.put(event6.cid, event6.bytes)
+    const before = count
+    head = await advance(blocks, head, event6.cid)
+
+    assert.equal(head.length, 2);
+    assert.equal(head[0].toString(),event5.cid.toString())
+    assert.equal(head[1].toString(),event6.cid.toString())
+    assert.equal(count-before,13,"The number of traversals should be 13 with optimization")
+  })
 })
