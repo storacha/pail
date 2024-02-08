@@ -221,7 +221,7 @@ describe('clock', () => {
     assert.equal(head[0].toString(), event1.cid.toString())
   })
 
-  it('test to compare retrivals', async () => {
+  it('test that contains only traverses history once', async () => {
     const blocks = new Blockstore()
     const root = await EventBlock.create(await randomEventData())
     await blocks.put(root.cid, root.bytes)
