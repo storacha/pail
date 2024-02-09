@@ -234,6 +234,7 @@ describe('clock', () => {
       count++
       return blockGet(cid)
     }
+    const before = count
     const event0 = await EventBlock.create(await randomEventData(), parents0)
     await blocks.put(event0.cid, event0.bytes)
     head = await advance(blocks, head, event0.cid)
@@ -253,34 +254,32 @@ describe('clock', () => {
     await blocks.put(event1.cid, event1.bytes)
     head = await advance(blocks, head, event1.cid)
 
-    const event2 = await EventBlock.create(await randomEventData(), parents0)
+    const event2 = await EventBlock.create(await randomEventData(), [event1.cid])
     await blocks.put(event2.cid, event2.bytes)
     head = await advance(blocks, head, event2.cid)
 
+    const event6 = await EventBlock.create(await randomEventData(), [event1.cid])
+    await blocks.put(event6.cid, event6.bytes)
+
+    head = await advance(blocks, head, event6.cid)
+
     const event3 = await EventBlock.create(await randomEventData(), [
-      event0c.cid,
-      event1.cid,
       event2.cid
     ])
     await blocks.put(event3.cid, event3.bytes)
     head = await advance(blocks, head, event3.cid)
 
-    const event4 = await EventBlock.create(await randomEventData(), [event0c.cid, event1.cid])
+    const event4 = await EventBlock.create(await randomEventData(), [event6.cid])
     await blocks.put(event4.cid, event4.bytes)
     head = await advance(blocks, head, event4.cid)
 
-    const event5 = await EventBlock.create(await randomEventData(), [event3.cid, event4.cid])
+    const event5 = await EventBlock.create(await randomEventData(), [event4.cid])
     await blocks.put(event5.cid, event5.bytes)
     head = await advance(blocks, head, event5.cid)
 
-    const event6 = await EventBlock.create(await randomEventData(), parents0)
-    await blocks.put(event6.cid, event6.bytes)
-    const before = count
-    head = await advance(blocks, head, event6.cid)
-
     assert.equal(head.length, 2)
-    assert.equal(head[0].toString(), event5.cid.toString())
-    assert.equal(head[1].toString(), event6.cid.toString())
-    assert.equal(count - before, 13, 'The number of traversals should be 13 with optimization')
+    assert.equal(head[1].toString(), event5.cid.toString())
+    assert.equal(head[0].toString(), event3.cid.toString())
+    assert.equal(count - before, 44, 'The number of traversals should be ?? with optimization')
   })
 })
