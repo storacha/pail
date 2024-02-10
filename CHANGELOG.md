@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.2](https://github.com/web3-storage/pail/compare/v0.4.1...v0.4.2) (2024-02-10)
+
+
+### Bug Fixes
+
+* traversal optimization when checking if x contains y ([#34](https://github.com/web3-storage/pail/issues/34)) ([3ef028a](https://github.com/web3-storage/pail/commit/3ef028ac5b9cfb4f59830c7b496f03a187841414))
+
 ## [0.4.1](https://github.com/web3-storage/pail/compare/v0.4.0...v0.4.1) (2024-01-25)
 
 
