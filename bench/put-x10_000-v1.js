@@ -1,12 +1,12 @@
 // eslint-disable-next-line no-unused-vars
-import * as API from '../src/api.js'
-import { put } from '../src/index.js'
-import { ShardBlock } from '../src/shard.js'
+import * as API from '../src/v1/api.js'
+import { put } from '../src/v1/index.js'
+import { ShardBlock } from '../src/v1/shard.js'
 import { MemoryBlockstore } from '../src/block.js'
 import { randomCID, randomString, randomInteger } from '../test/helpers.js'
 import { collectMetrics, verify, writePail } from './util.js'
 
-const NUM = 10_000
+const NUM = 1_000_000
 
 async function main () {
   console.log('setup')

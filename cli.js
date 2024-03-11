@@ -10,8 +10,9 @@ import clc from 'cli-color'
 import archy from 'archy'
 // eslint-disable-next-line no-unused-vars
 import * as API from './src/api.js'
-import { put, get, del, entries } from './src/index.js'
-import { ShardFetcher, ShardBlock, MaxShardSize } from './src/shard.js'
+import { put, get, del, entries } from './src/v1/index.js'
+import { ShardFetcher, ShardBlock } from './src/v1/shard.js'
+import { MaxShardSize } from './src/shard.js'
 import { difference } from './src/diff.js'
 import { merge } from './src/merge.js'
 
