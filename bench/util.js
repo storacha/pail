@@ -2,10 +2,10 @@ import fs from 'fs'
 import { Readable } from 'stream'
 import { CarWriter } from '@ipld/car'
 // eslint-disable-next-line no-unused-vars
-import * as API from '../src/v1/api.js'
-import { get, entries } from '../src/v1/index.js'
+import * as API from '../src/api.js'
+import { get, entries } from '../src/index.js'
 import { MemoryBlockstore } from '../src/block.js'
-import { ShardFetcher } from '../src/v1/shard.js'
+import { ShardFetcher } from '../src/shard.js'
 
 /**
  * @param {MemoryBlockstore} blocks
@@ -74,21 +74,4 @@ export const collectMetrics = async (blocks, root) => {
     avgShardSize: Math.round(totalSize / totalShards),
     totalSize
   }
-}
-
-/**
- * @param {MemoryBlockstore} blocks
- * @param {API.ShardLink} root
- * @param {Map<string, API.UnknownLink>} data
- */
-export const verify = async (blocks, root, data) => {
-  for (const [k, v] of data) {
-    const result = await get(blocks, root, k)
-    if (!result) throw new Error(`missing item: "${k}": ${v}`)
-    if (result.toString() !== v.toString()) throw new Error(`incorrect value for ${k}: ${result} !== ${v}`)
-  }
-  let total = 0
-  for await (const _ of entries(blocks, root)) total++
-  if (data.size !== total) throw new Error(`incorrect entry count: ${total} !== ${data.size}`)
-  console.log(`✅ verified correct`)
 }

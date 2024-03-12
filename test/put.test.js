@@ -3,39 +3,9 @@ import assert from 'node:assert'
 import { nanoid } from 'nanoid'
 // eslint-disable-next-line no-unused-vars
 import * as API from '../src/api.js'
-import { put, get } from '../src/index.js'
-import { ShardBlock, MaxKeyLength } from '../src/shard.js'
-import * as Shard from '../src/shard.js'
-import { Blockstore, randomCID } from './helpers.js'
-
-const maxShardSize = 1024 // tiny shard size for testing
-
-/**
- * Fill a shard until it exceeds the size limit. Returns the entry that will
- * cause the limit to exceed.
- *
- * @param {API.Shard} shard
- * @param {(i: number) => Promise<API.ShardValueEntry>} [mkentry]
- */
-async function fillShard (shard, mkentry) {
-  mkentry = mkentry ?? (async () => [nanoid(), await randomCID(32)])
-  let i = 0
-  while (true) {
-    const entry = await mkentry(i)
-    const blk = await Shard.encodeBlock(
-      Shard.withEntries(
-        Shard.putEntry(shard.entries, entry),
-        shard
-      )
-    )
-    if (blk.bytes.length > shard.maxSize) return { shard, entry }
-    shard = Shard.withEntries(
-      Shard.putEntry(shard.entries, entry),
-      shard
-    )
-    i++
-  }
-}
+import { put } from '../src/index.js'
+import { ShardBlock } from '../src/shard.js'
+import { Blockstore, materialize, putAll, randomCID, randomInteger, randomString, verify } from './helpers.js'
 
 describe('put', () => {
   it('put to empty shard', async () => {
@@ -80,80 +50,151 @@ describe('put', () => {
     assert.equal(result1.root.toString(), result0.root.toString())
   })
 
-  it('auto-shards on long key', async () => {
+  it('auto-shards on similar key', async () => {
     const root = await ShardBlock.create()
     const blocks = new Blockstore()
     await blocks.put(root.cid, root.bytes)
 
     const dataCID = await randomCID(32)
-    const key = Array(MaxKeyLength + 1).fill('a').join('')
-    const result = await put(blocks, root.cid, key, dataCID)
 
-    assert.equal(result.removals.length, 1)
-    assert.equal(result.removals[0].cid.toString(), root.cid.toString())
-    assert.equal(result.additions.length, 2)
-    assert.equal(result.additions[0].value.entries.length, 1)
-    assert.equal(result.additions[0].value.entries[0][0], key.slice(-1))
-    assert.equal(result.additions[0].value.entries[0][1].toString(), dataCID.toString())
-    assert.equal(result.additions[1].value.entries.length, 1)
-    assert.equal(result.additions[1].value.entries[0][0], key.slice(0, -1))
-    assert.equal(result.additions[1].value.entries[0][1][0].toString(), result.additions[0].cid.toString())
+    const res = await putAll(blocks, root.cid, [
+      ['aaaa', dataCID],
+      ['aabb', dataCID]
+    ])
+
+    assert.deepEqual(
+      await materialize(blocks, res.root),
+      [
+        [
+          'a',
+          [
+            [
+              [
+                'a',
+                [
+                  [
+                    ['aa', dataCID],
+                    ['bb', dataCID]
+                  ]
+                ]
+              ]
+            ]
+          ]
+        ]
+      ]
+    )
   })
 
-  it('auto-shards on super long key', async () => {
+  it('put to shard link', async () => {
     const root = await ShardBlock.create()
     const blocks = new Blockstore()
     await blocks.put(root.cid, root.bytes)
 
     const dataCID = await randomCID(32)
-    const key = Array(MaxKeyLength * 2 + 1).fill('b').join('')
-    const result = await put(blocks, root.cid, key, dataCID)
 
-    assert.equal(result.removals.length, 1)
-    assert.equal(result.removals[0].cid.toString(), root.cid.toString())
-    assert.equal(result.additions.length, 3)
-    assert.equal(result.additions[0].value.entries.length, 1)
-    assert.equal(result.additions[0].value.entries[0][0], key.slice(-1))
-    assert.equal(result.additions[0].value.entries[0][1].toString(), dataCID.toString())
-    assert.equal(result.additions[1].value.entries.length, 1)
-    assert.equal(result.additions[1].value.entries[0][0], key.slice(MaxKeyLength, MaxKeyLength * 2))
-    assert.equal(result.additions[1].value.entries[0][1][0].toString(), result.additions[0].cid.toString())
-    assert.equal(result.additions[2].value.entries.length, 1)
-    assert.equal(result.additions[2].value.entries[0][0], key.slice(0, MaxKeyLength))
-    assert.equal(result.additions[2].value.entries[0][1][0].toString(), result.additions[1].cid.toString())
+    const res = await putAll(blocks, root.cid, [
+      ['aaaa', dataCID],
+      ['aabb', dataCID],
+      ['aa', dataCID]
+    ])
+
+    assert.deepEqual(
+      await materialize(blocks, res.root),
+      [
+        [
+          'a',
+          [
+            [
+              [
+                'a',
+                [
+                  [
+                    ['aa', dataCID],
+                    ['bb', dataCID]
+                  ],
+                  dataCID
+                ]
+              ]
+            ]
+          ]
+        ]
+      ]
+    )
   })
 
-  // TODO: deep shard propagates to root
+  it('deterministic structure', async () => {
+    const dataCID = await randomCID(32)
+    /** @type {Array<[string, API.UnknownLink]>} */
+    const items = [
+      ['aaaa', dataCID],
+      ['aaab', dataCID],
+      ['aabb', dataCID],
+      ['abbb', dataCID],
+      ['bbbb', dataCID]
+    ]
+    const orders = [
+      [0, 1, 2, 3, 4],
+      [4, 3, 2, 1, 0],
+      [1, 2, 4, 0, 3],
+      [2, 0, 3, 4, 1],
+    ]
+    for (const order of orders) {
+      const root = await ShardBlock.create()
+      const blocks = new Blockstore()
+      await blocks.put(root.cid, root.bytes)
 
-  it('shards at size limit', async () => {
+      const res = await putAll(blocks, root.cid, order.map(i => items[i]))
+
+      assert.deepEqual(
+        await materialize(blocks, res.root),
+        [
+          [
+            'a',
+            [
+              [
+                [
+                  'a',
+                  [
+                    [
+                      [
+                        'a',
+                        [
+                          [
+                            ['a', dataCID],
+                            ['b', dataCID]
+                          ]
+                        ]
+                      ],
+                      ['bb', dataCID]
+                    ]
+                  ]
+                ],
+                ['bbb', dataCID]
+              ]
+            ]
+          ],
+          ['bbbb', dataCID]
+        ]
+      )
+    }
+  })
+
+  it('put 10,000x', async function () {
+    this.timeout(1000 * 10)
+
+    const root = await ShardBlock.create()
     const blocks = new Blockstore()
-    const pfx = 'test/'
-    const { shard, entry: [k, v] } = await fillShard(Shard.create({ maxSize: maxShardSize }), async () => {
-      return [pfx + nanoid(), await randomCID(1)]
-    })
-    const rootblk0 = await Shard.encodeBlock(shard)
-    await blocks.put(rootblk0.cid, rootblk0.bytes)
+    await blocks.put(root.cid, root.bytes)
 
-    const { root, additions, removals } = await put(blocks, rootblk0.cid, k, v)
-
-    assert.notEqual(root.toString(), rootblk0.cid.toString())
-    assert.equal(removals.length, 1)
-    assert.equal(removals[0].cid.toString(), rootblk0.cid.toString())
-
-    for (const b of additions) {
-      await blocks.put(b.cid, b.bytes)
+    /** @type {Array<[string, API.UnknownLink]>} */
+    const items = []
+    for (let i = 0; i < 10_000; i++) {
+      const k = randomString(randomInteger(1, 64))
+      const v = await randomCID(randomInteger(8, 128))
+      items.push([k, v])
     }
 
-    const rootblk1 = await blocks.getShardBlock(root)
-
-    const entry = rootblk1.value.entries.find(([, v]) => Array.isArray(v))
-    assert(entry, 'should find a shard entry')
-    assert(entry[0].startsWith(pfx))
-
-    for (const [k, v] of rootblk0.value.entries) {
-      const value = await get(blocks, rootblk1.cid, k)
-      assert(value)
-      assert.equal(value.toString(), v.toString())
-    }
+    const res = await putAll(blocks, root.cid, items)
+    await assert.doesNotReject(verify(blocks, res.root, new Map(items)))
   })
 })

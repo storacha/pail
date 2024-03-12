@@ -4,7 +4,7 @@ import { put } from '../src/index.js'
 import { ShardBlock } from '../src/shard.js'
 import { MemoryBlockstore } from '../src/block.js'
 import { randomCID, randomString, randomInteger } from '../test/helpers.js'
-import { collectMetrics, verify, writePail } from './util.js'
+import { collectMetrics, writePail } from './util.js'
 
 const NUM = 10_000
 
@@ -50,7 +50,6 @@ async function main () {
     console.timeEnd(`put x${NUM}`)
     await writePail(blocks, root)
     console.log(await collectMetrics(blocks, root))
-    await verify(blocks, root, new Map(kvs))
   }
 }
 
