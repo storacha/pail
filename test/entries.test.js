@@ -73,4 +73,72 @@ describe('entries', () => {
       assert.equal(results[i][0], key)
     }
   })
+
+  it('lists entries by key greater than string', async () => {
+    const empty = await ShardBlock.create()
+    const blocks = new Blockstore()
+    await blocks.put(empty.cid, empty.bytes)
+
+    /** @type {Array<[string, API.UnknownLink]>} */
+    const testdata = [
+      ['cccc', await randomCID(32)],
+      ['deee', await randomCID(32)],
+      ['dooo', await randomCID(32)],
+      ['beee', await randomCID(32)]
+    ]
+
+    /** @type {API.ShardLink} */
+    let root = empty.cid
+    for (const [k, v] of testdata) {
+      const res = await put(blocks, root, k, v)
+      for (const b of res.additions) {
+        await blocks.put(b.cid, b.bytes)
+      }
+      root = res.root
+    }
+
+    const gt = 'beee'
+    const results = []
+    for await (const entry of entries(blocks, root, { gt })) {
+      results.push(entry)
+    }
+
+    for (const [i, key] of testdata.map(d => d[0]).filter(k => k > gt).sort().entries()) {
+      assert.equal(results[i][0], key)
+    }
+  })
+
+  it('lists entries by key greater than or equal to string', async () => {
+    const empty = await ShardBlock.create()
+    const blocks = new Blockstore()
+    await blocks.put(empty.cid, empty.bytes)
+
+    /** @type {Array<[string, API.UnknownLink]>} */
+    const testdata = [
+      ['cccc', await randomCID(32)],
+      ['deee', await randomCID(32)],
+      ['dooo', await randomCID(32)],
+      ['beee', await randomCID(32)]
+    ]
+
+    /** @type {API.ShardLink} */
+    let root = empty.cid
+    for (const [k, v] of testdata) {
+      const res = await put(blocks, root, k, v)
+      for (const b of res.additions) {
+        await blocks.put(b.cid, b.bytes)
+      }
+      root = res.root
+    }
+
+    const gte = 'beee'
+    const results = []
+    for await (const entry of entries(blocks, root, { gte })) {
+      results.push(entry)
+    }
+
+    for (const [i, key] of testdata.map(d => d[0]).filter(k => k >= gte).sort().entries()) {
+      assert.equal(results[i][0], key)
+    }
+  })
 })
