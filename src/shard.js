@@ -175,3 +175,6 @@ export const putEntry = (target, newEntry) => {
 
   return entries
 }
+
+/** @param {string} s */
+export const isPrintableASCII = s => /^[\x20-\x7E]*$/.test(s)

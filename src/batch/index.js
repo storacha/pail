@@ -13,17 +13,19 @@ class Batcher {
    * @param {API.BlockFetcher} init.blocks Block storage.
    * @param {API.BatcherShardEntry[]} init.entries The entries in this shard.
    * @param {string} init.prefix Key prefix.
-   * @param {number} init.maxSize
-   * @param {number} init.maxKeyLength
+   * @param {number} init.version Shard compatibility version.
+   * @param {string} init.keyChars Characters allowed in keys, referring to a known character set.
+   * @param {number} init.maxKeySize Max key size in bytes.
    * @param {API.ShardBlockView} init.base Original shard this batcher is based on.
    */
-  constructor ({ blocks, entries, prefix, maxSize, maxKeyLength, base }) {
+  constructor ({ blocks, entries, prefix, version, keyChars, maxKeySize, base }) {
     this.blocks = blocks
     this.prefix = prefix
     this.entries = [...entries]
     this.base = base
-    this.maxSize = maxSize
-    this.maxKeyLength = maxKeyLength
+    this.version = version
+    this.keyChars = keyChars
+    this.maxKeySize = maxKeySize
   }
 
   /**
@@ -46,12 +48,11 @@ class Batcher {
    * @param {object} init
    * @param {API.BlockFetcher} init.blocks Block storage.
    * @param {API.ShardLink} init.link CID of the shard block.
-   * @param {string} init.prefix
    */
-  static async create ({ blocks, link, prefix }) {
+  static async create ({ blocks, link }) {
     const shards = new ShardFetcher(blocks)
     const base = await shards.get(link)
-    return new Batcher({ blocks, prefix, base, ...base.value })
+    return new Batcher({ blocks, base, ...base.value })
   }
 }
 
@@ -169,8 +170,8 @@ export const traverse = async (shards, key, shard) => {
     if (key <= k) break
     if (key.startsWith(k) && Array.isArray(v)) {
       if (Shard.isShardLink(v[0])) {
-        const blk = await shards.get(v[0], shard.prefix + k)
-        const batcher = BatcherShard.create({ base: blk, prefix: blk.prefix, ...blk.value })
+        const blk = await shards.get(v[0])
+        const batcher = BatcherShard.create({ base: blk, ...blk.value })
         shard.entries[i] = [k, v[1] == null ? [batcher] : [batcher, v[1]]]
         return traverse(shards, key.slice(k.length), batcher)
       }
@@ -208,7 +209,7 @@ export const commit = async shard => {
     }
   }
 
-  const block = await Shard.encodeBlock(Shard.withEntries(entries, shard), shard.prefix)
+  const block = await Shard.encodeBlock(Shard.withEntries(entries, shard))
   additions.push(block)
 
   if (shard.base && shard.base.cid.toString() === block.cid.toString()) {
@@ -231,7 +232,7 @@ const asShardEntry = entry => /** @type {API.ShardEntry} */ (entry)
  * @param {API.ShardLink} root CID of the root shard block.
  * @returns {Promise<API.Batcher>}
  */
-export const create = (blocks, root) => Batcher.create({ blocks, link: root, prefix: '' })
+export const create = (blocks, root) => Batcher.create({ blocks, link: root })
 
 export class BatchCommittedError extends Error {
   /**

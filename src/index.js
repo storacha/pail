@@ -1,10 +1,7 @@
 // eslint-disable-next-line no-unused-vars
 import * as API from './api.js'
-import { ShardFetcher } from './shard.js'
+import { ShardFetcher, isPrintableASCII } from './shard.js'
 import * as Shard from './shard.js'
-
-/** @param {string} s */
-const isPrintableASCII = s => /^[\x20-\x7E]*$/.test(s)
 
 /**
  * Put a value (a CID) for the given key. If the key exists it's value is

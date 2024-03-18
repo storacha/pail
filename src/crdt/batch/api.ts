@@ -1,7 +1,6 @@
 import {
   Batcher,
   BatcherShardEntry,
-  ShardDiff,
   ShardBlockView,
   BlockFetcher,
   ShardLink,
