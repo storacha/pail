@@ -222,11 +222,13 @@ export const del = async (blocks, root, key) => {
  * @param {API.BlockFetcher} blocks Bucket block storage.
  * @param {API.ShardLink} root CID of the root node of the bucket.
  * @param {object} [options]
- * @param {string} [options.prefix]
+ * @param {string} [options.prefix] Filter results to entries with keys prefixed with this string.
+ * @param {string} [options.gt] Filter results to entries with keys greater than this string.
+ * @param {string} [options.gte] Filter results to entries with keys greater than or equal to this string.
  * @returns {AsyncIterableIterator<API.ShardValueEntry>}
  */
 export const entries = async function * (blocks, root, options = {}) {
-  const { prefix } = options
+  const { prefix, gt, gte } = options
   const shards = new ShardFetcher(blocks)
   const rshard = await shards.get(root)
 
@@ -238,7 +240,12 @@ export const entries = async function * (blocks, root, options = {}) {
 
         if (Array.isArray(entry[1])) {
           if (entry[1][1]) {
-            if (!prefix || (prefix && key.startsWith(prefix))) {
+            if (
+              (prefix && key.startsWith(prefix)) ||
+              (gt && key > gt) ||
+              (gte && key >= gte) ||
+              (!prefix && !gt && !gte)
+            ) {
               yield [key, entry[1][1]]
             }
           }
@@ -250,13 +257,31 @@ export const entries = async function * (blocks, root, options = {}) {
             if (prefix.length > key.length && !prefix.startsWith(key)) {
               continue
             }
+          } else if (gt) {
+            if (gt.length <= key.length && !key.startsWith(gt)) {
+              continue
+            }
+            if (gt.length > key.length && !gt.startsWith(key)) {
+              continue
+            }
+          } else if (gte) {
+            if (gte.length <= key.length && !key.startsWith(gte)) {
+              continue
+            }
+            if (gte.length > key.length && !gte.startsWith(key)) {
+              continue
+            }
           }
           yield * ents(await shards.get(entry[1][0], key))
         } else {
-          if (prefix && !key.startsWith(prefix)) {
-            continue
+          if (
+            (prefix && key.startsWith(prefix)) ||
+            (gt && key > gt) ||
+            (gte && key >= gte) ||
+            (!prefix && !gt && !gte)
+          ) {
+            yield [key, entry[1]]
           }
-          yield [key, entry[1]]
         }
       }
     }
