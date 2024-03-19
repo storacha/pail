@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/web3-storage/pail/compare/v0.4.2...v0.5.0) (2024-03-19)
+
+
+### Features
+
+* filter entries with keys greater than this string ([#37](https://github.com/web3-storage/pail/issues/37)) ([444ccd7](https://github.com/web3-storage/pail/commit/444ccd79e8d99fcc06b7528344aab683dcc3341c))
+
 ## [0.4.2](https://github.com/web3-storage/pail/compare/v0.4.1...v0.4.2) (2024-02-10)
 
 
