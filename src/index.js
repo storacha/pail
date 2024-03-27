@@ -349,10 +349,10 @@ export const entries = async function * (blocks, root, options) {
               continue
             }
           } else if (
-            (hasKeyLowerBoundRangeExclusive && (key.slice(0, options.gt.length) <= options.gt)) ||
-            (hasKeyLowerBoundRangeInclusive && (key.slice(0, options.gte.length) < options.gte)) ||
-            (hasKeyUpperBoundRangeExclusive && (key.slice(0, options.lt.length) >= options.lt)) ||
-            (hasKeyUpperBoundRangeInclusive && (key.slice(0, options.lte.length) > options.lte))
+            (hasKeyLowerBoundRangeExclusive && (trunc(key, Math.min(key.length, options.gt.length)) < trunc(options.gt, Math.min(key.length, options.gt.length)))) ||
+            (hasKeyLowerBoundRangeInclusive && (trunc(key, Math.min(key.length, options.gte.length)) < trunc(options.gte, Math.min(key.length, options.gte.length)))) ||
+            (hasKeyUpperBoundRangeExclusive && (trunc(key, Math.min(key.length, options.lt.length)) > trunc(options.lt, Math.min(key.length, options.lt.length)))) ||
+            (hasKeyUpperBoundRangeInclusive && (trunc(key, Math.min(key.length, options.lte.length)) > trunc(options.lte, Math.min(key.length, options.lte.length))))
           ) {
             continue
           }
@@ -377,6 +377,12 @@ export const entries = async function * (blocks, root, options) {
     }
   )(rshard)
 }
+
+/**
+ * @param {string} str
+ * @param {number} len
+ */
+const trunc = (str, len) => str.length <= len ? str : str.slice(0, len)
 
 /**
  * Traverse from the passed shard block to the target shard block using the
