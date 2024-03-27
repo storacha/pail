@@ -244,7 +244,10 @@ export const del = async (blocks, root, key) => {
  * @param {API.EntriesOptions} [options]
  * @returns {options is API.KeyPrefixOption}
  */
-const isKeyPrefixOption = options => 'prefix' in (options ?? {})
+const isKeyPrefixOption = options => {
+  const opts = options ?? {}
+  return 'prefix' in opts && Boolean(opts.prefix)
+}
 
 /**
  * @param {API.EntriesOptions} [options]
@@ -252,44 +255,44 @@ const isKeyPrefixOption = options => 'prefix' in (options ?? {})
  */
 const isKeyRangeOption = options => {
   const opts = options ?? {}
-  return 'gt' in opts || 'gte' in opts || 'lt' in opts || 'lte' in opts
+  return ('gt' in opts && Boolean(opts.gt)) || ('gte' in opts && Boolean(opts.gte)) || ('lt' in opts && Boolean(opts.lt)) || ('lte' in opts && Boolean(opts.lte))
 }
 
 /**
  * @param {API.KeyRangeOption} options
  * @returns {options is API.KeyLowerBoundRangeOption}
  */
-const isKeyLowerBoundRangeOption = options => 'gt' in options || 'gte' in options
+const isKeyLowerBoundRangeOption = options => ('gt' in options && Boolean(options.gt)) || ('gte' in options && Boolean(options.gte))
 
 /**
  * @param {API.KeyLowerBoundRangeOption} options
  * @returns {options is API.KeyLowerBoundRangeInclusiveOption}
  */
-const isKeyLowerBoundRangeInclusiveOption = options => 'gte' in options
+const isKeyLowerBoundRangeInclusiveOption = options => 'gte' in options && Boolean(options.gte)
 
 /**
  * @param {API.KeyLowerBoundRangeOption} options
  * @returns {options is API.KeyLowerBoundRangeExclusiveOption}
  */
-const isKeyLowerBoundRangeExclusiveOption = options => 'gt' in options
+const isKeyLowerBoundRangeExclusiveOption = options => 'gt' in options && Boolean(options.gt)
 
 /**
  * @param {API.KeyRangeOption} options
  * @returns {options is API.KeyUpperBoundRangeOption}
  */
-const isKeyUpperBoundRangeOption = options => 'lt' in options || 'lte' in options
+const isKeyUpperBoundRangeOption = options => ('lt' in options && Boolean(options.lt)) || ('lte' in options && Boolean(options.lte))
 
 /**
  * @param {API.KeyUpperBoundRangeOption} options
  * @returns {options is API.KeyUpperBoundRangeInclusiveOption}
  */
-const isKeyUpperBoundRangeInclusiveOption = options => 'lte' in options
+const isKeyUpperBoundRangeInclusiveOption = options => 'lte' in options && Boolean(options.lte)
 
 /**
  * @param {API.KeyUpperBoundRangeOption} options
  * @returns {options is API.KeyUpperBoundRangeExclusiveOption}
  */
-const isKeyUpperBoundRangeExclusiveOption = options => 'lt' in options
+const isKeyUpperBoundRangeExclusiveOption = options => 'lt' in options && Boolean(options.lt)
 
 /**
  * List entries in the bucket.
