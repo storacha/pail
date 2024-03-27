@@ -249,10 +249,12 @@ export const del = async (blocks, root, key) => {
  * @param {string} [options.prefix] Filter results to entries with keys prefixed with this string.
  * @param {string} [options.gt] Filter results to entries with keys greater than this string.
  * @param {string} [options.gte] Filter results to entries with keys greater than or equal to this string.
+ * @param {string} [options.lt] Filter results to entries with keys less than this string.
+ * @param {string} [options.lte] Filter results to entries with keys less than or equal to this string.
  * @returns {AsyncIterableIterator<API.ShardValueEntry>}
  */
 export const entries = async function * (blocks, root, options = {}) {
-  const { prefix, gt, gte } = options
+  const { prefix, gt, gte, lt, lte } = options
   const shards = new ShardFetcher(blocks)
   const rshard = await shards.get(root)
 
@@ -268,6 +270,8 @@ export const entries = async function * (blocks, root, options = {}) {
               (prefix && key.startsWith(prefix)) ||
               (gt && key > gt) ||
               (gte && key >= gte) ||
+              (lt && key < lt) ||
+              (lte && key <= lte) ||
               (!prefix && !gt && !gte)
             ) {
               yield [key, entry[1][1]]
@@ -295,6 +299,20 @@ export const entries = async function * (blocks, root, options = {}) {
             if (gte.length > key.length && !gte.startsWith(key)) {
               continue
             }
+          } else if (lt) {
+            if (lt.length <= key.length && !key.startsWith(lt)) {
+              continue
+            }
+            if (lt.length > key.length && !lt.startsWith(key)) {
+              continue
+            }
+          } else if (lte) {
+            if (lte.length <= key.length && !key.startsWith(lte)) {
+              continue
+            }
+            if (lte.length > key.length && !lte.startsWith(key)) {
+              continue
+            }
           }
           yield * ents(await shards.get(entry[1][0]))
         } else {
@@ -302,6 +320,8 @@ export const entries = async function * (blocks, root, options = {}) {
             (prefix && key.startsWith(prefix)) ||
             (gt && key > gt) ||
             (gte && key >= gte) ||
+            (lt && key < lt) ||
+            (lte && key <= lte) ||
             (!prefix && !gt && !gte)
           ) {
             yield [key, entry[1]]
