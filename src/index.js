@@ -241,20 +241,75 @@ export const del = async (blocks, root, key) => {
 }
 
 /**
+ * @param {API.EntriesOptions} [options]
+ * @returns {options is API.KeyPrefixOption}
+ */
+const isKeyPrefixOption = options => 'prefix' in (options ?? {})
+
+/**
+ * @param {API.EntriesOptions} [options]
+ * @returns {options is API.KeyRangeOption}
+ */
+const isKeyRangeOption = options => {
+  const opts = options ?? {}
+  return 'gt' in opts || 'gte' in opts || 'lt' in opts || 'lte' in opts
+}
+
+/**
+ * @param {API.KeyRangeOption} options
+ * @returns {options is API.KeyLowerBoundRangeOption}
+ */
+const isKeyLowerBoundRangeOption = options => 'gt' in options || 'gte' in options
+
+/**
+ * @param {API.KeyLowerBoundRangeOption} options
+ * @returns {options is API.KeyLowerBoundRangeInclusiveOption}
+ */
+const isKeyLowerBoundRangeInclusiveOption = options => 'gte' in options
+
+/**
+ * @param {API.KeyLowerBoundRangeOption} options
+ * @returns {options is API.KeyLowerBoundRangeExclusiveOption}
+ */
+const isKeyLowerBoundRangeExclusiveOption = options => 'gt' in options
+
+/**
+ * @param {API.KeyRangeOption} options
+ * @returns {options is API.KeyUpperBoundRangeOption}
+ */
+const isKeyUpperBoundRangeOption = options => 'lt' in options || 'lte' in options
+
+/**
+ * @param {API.KeyUpperBoundRangeOption} options
+ * @returns {options is API.KeyUpperBoundRangeInclusiveOption}
+ */
+const isKeyUpperBoundRangeInclusiveOption = options => 'lte' in options
+
+/**
+ * @param {API.KeyUpperBoundRangeOption} options
+ * @returns {options is API.KeyUpperBoundRangeExclusiveOption}
+ */
+const isKeyUpperBoundRangeExclusiveOption = options => 'lt' in options
+
+/**
  * List entries in the bucket.
  *
  * @param {API.BlockFetcher} blocks Bucket block storage.
  * @param {API.ShardLink} root CID of the root node of the bucket.
- * @param {object} [options]
- * @param {string} [options.prefix] Filter results to entries with keys prefixed with this string.
- * @param {string} [options.gt] Filter results to entries with keys greater than this string.
- * @param {string} [options.gte] Filter results to entries with keys greater than or equal to this string.
- * @param {string} [options.lt] Filter results to entries with keys less than this string.
- * @param {string} [options.lte] Filter results to entries with keys less than or equal to this string.
+ * @param {API.EntriesOptions} [options]
  * @returns {AsyncIterableIterator<API.ShardValueEntry>}
  */
-export const entries = async function * (blocks, root, options = {}) {
-  const { prefix, gt, gte, lt, lte } = options
+export const entries = async function * (blocks, root, options) {
+  const hasKeyPrefix = isKeyPrefixOption(options)
+  const hasKeyRange = isKeyRangeOption(options)
+  const hasKeyLowerBoundRange = hasKeyRange && isKeyLowerBoundRangeOption(options)
+  const hasKeyLowerBoundRangeInclusive = hasKeyLowerBoundRange && isKeyLowerBoundRangeInclusiveOption(options)
+  const hasKeyLowerBoundRangeExclusive = hasKeyLowerBoundRange && isKeyLowerBoundRangeExclusiveOption(options)
+  const hasKeyUpperBoundRange = hasKeyRange && isKeyUpperBoundRangeOption(options)
+  const hasKeyUpperBoundRangeInclusive = hasKeyUpperBoundRange && isKeyUpperBoundRangeInclusiveOption(options)
+  const hasKeyUpperBoundRangeExclusive = hasKeyUpperBoundRange && isKeyUpperBoundRangeExclusiveOption(options)
+  const hasKeyUpperAndLowerBoundRange = hasKeyLowerBoundRange && hasKeyUpperBoundRange
+
   const shards = new ShardFetcher(blocks)
   const rshard = await shards.get(root)
 
@@ -264,65 +319,53 @@ export const entries = async function * (blocks, root, options = {}) {
       for (const entry of shard.value.entries) {
         const key = shard.value.prefix + entry[0]
 
+        // if array, this is a link to a shard
         if (Array.isArray(entry[1])) {
           if (entry[1][1]) {
             if (
-              (prefix && key.startsWith(prefix)) ||
-              (gt && key > gt) ||
-              (gte && key >= gte) ||
-              (lt && key < lt) ||
-              (lte && key <= lte) ||
-              (!prefix && !gt && !gte)
+              (hasKeyPrefix && key.startsWith(options.prefix)) ||
+              (hasKeyUpperAndLowerBoundRange && (
+                ((hasKeyLowerBoundRangeExclusive && key > options.gt) || (hasKeyLowerBoundRangeInclusive && key >= options.gte)) &&
+                ((hasKeyUpperBoundRangeExclusive && key < options.lt) || (hasKeyUpperBoundRangeInclusive && key <= options.lte))
+              )) ||
+              (hasKeyLowerBoundRangeExclusive && key > options.gt) ||
+              (hasKeyLowerBoundRangeInclusive && key >= options.gte) ||
+              (hasKeyUpperBoundRangeExclusive && key < options.lt) ||
+              (hasKeyUpperBoundRangeInclusive && key <= options.lte) ||
+              (!hasKeyPrefix && !hasKeyRange)
             ) {
               yield [key, entry[1][1]]
             }
           }
 
-          if (prefix) {
-            if (prefix.length <= key.length && !key.startsWith(prefix)) {
+          if (hasKeyPrefix) {
+            if (options.prefix.length <= key.length && !key.startsWith(options.prefix)) {
               continue
             }
-            if (prefix.length > key.length && !prefix.startsWith(key)) {
+            if (options.prefix.length > key.length && !options.prefix.startsWith(key)) {
               continue
             }
-          } else if (gt) {
-            if (gt.length <= key.length && !key.startsWith(gt)) {
-              continue
-            }
-            if (gt.length > key.length && !gt.startsWith(key)) {
-              continue
-            }
-          } else if (gte) {
-            if (gte.length <= key.length && !key.startsWith(gte)) {
-              continue
-            }
-            if (gte.length > key.length && !gte.startsWith(key)) {
-              continue
-            }
-          } else if (lt) {
-            if (lt.length <= key.length && !key.startsWith(lt)) {
-              continue
-            }
-            if (lt.length > key.length && !lt.startsWith(key)) {
-              continue
-            }
-          } else if (lte) {
-            if (lte.length <= key.length && !key.startsWith(lte)) {
-              continue
-            }
-            if (lte.length > key.length && !lte.startsWith(key)) {
-              continue
-            }
+          } else if (
+            (hasKeyLowerBoundRangeExclusive && (key.slice(0, options.gt.length) <= options.gt)) ||
+            (hasKeyLowerBoundRangeInclusive && (key.slice(0, options.gte.length) < options.gte)) ||
+            (hasKeyUpperBoundRangeExclusive && (key.slice(0, options.lt.length) >= options.lt)) ||
+            (hasKeyUpperBoundRangeInclusive && (key.slice(0, options.lte.length) > options.lte))
+          ) {
+            continue
           }
           yield * ents(await shards.get(entry[1][0]))
         } else {
           if (
-            (prefix && key.startsWith(prefix)) ||
-            (gt && key > gt) ||
-            (gte && key >= gte) ||
-            (lt && key < lt) ||
-            (lte && key <= lte) ||
-            (!prefix && !gt && !gte)
+            (hasKeyPrefix && key.startsWith(options.prefix)) ||
+            (hasKeyRange && hasKeyUpperAndLowerBoundRange && (
+              ((hasKeyLowerBoundRangeExclusive && key > options.gt) || (hasKeyLowerBoundRangeInclusive && key >= options.gte)) &&
+              ((hasKeyUpperBoundRangeExclusive && key < options.lt) || (hasKeyUpperBoundRangeInclusive && key <= options.lte))
+            )) ||
+            (hasKeyRange && !hasKeyUpperAndLowerBoundRange && (
+              (hasKeyLowerBoundRangeExclusive && key > options.gt) || (hasKeyLowerBoundRangeInclusive && key >= options.gte) ||
+              (hasKeyUpperBoundRangeExclusive && key < options.lt) || (hasKeyUpperBoundRangeInclusive && key <= options.lte)
+            )) ||
+            (!hasKeyPrefix && !hasKeyRange)
           ) {
             yield [key, entry[1]]
           }

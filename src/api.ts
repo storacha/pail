@@ -50,3 +50,41 @@ export interface ShardConfig {
 }
 
 export type ShardOptions = Partial<ShardConfig>
+
+export interface KeyPrefixOption {
+  /** Filter results to entries with keys prefixed with this string. */
+  prefix: string
+}
+
+export type KeyRangeOption =
+  | KeyLowerBoundRangeOption
+  | KeyUpperBoundRangeOption
+  | (KeyLowerBoundRangeOption & KeyUpperBoundRangeOption)
+
+export type KeyLowerBoundRangeOption =
+  | KeyLowerBoundRangeExclusiveOption
+  | KeyLowerBoundRangeInclusiveOption
+
+export interface KeyLowerBoundRangeExclusiveOption {
+  gt: string
+}
+
+export interface KeyLowerBoundRangeInclusiveOption {
+  gte: string
+}
+
+export type KeyUpperBoundRangeOption =
+  | KeyUpperBoundRangeExclusiveOption
+  | KeyUpperBoundRangeInclusiveOption
+
+export interface KeyUpperBoundRangeExclusiveOption {
+  lt: string
+}
+
+export interface KeyUpperBoundRangeInclusiveOption {
+  lte: string
+}
+
+export type EntriesOptions =
+  | KeyPrefixOption
+  | KeyRangeOption
