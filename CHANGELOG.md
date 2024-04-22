@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/web3-storage/pail/compare/v0.5.0...v0.6.0) (2024-04-22)
+
+
+### Features
+
+* deterministic DAG structure ([#36](https://github.com/web3-storage/pail/issues/36)) ([a26acea](https://github.com/web3-storage/pail/commit/a26acea204898ffd3df8eba53d61640f7d680b88))
+
 ## [0.5.0](https://github.com/web3-storage/pail/compare/v0.4.2...v0.5.0) (2024-03-19)
 
 
