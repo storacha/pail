@@ -228,8 +228,7 @@ export const get = async (blocks, head, key) => {
 /**
  * @param {API.BlockFetcher} blocks Bucket block storage.
  * @param {API.EventLink<API.Operation>[]} head Merkle clock head.
- * @param {object} [options]
- * @param {string} [options.prefix]
+ * @param {API.EntriesOptions} [options]
  */
 export const entries = async function * (blocks, head, options) {
   if (!head.length) return

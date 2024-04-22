@@ -1,6 +1,6 @@
 // eslint-disable-next-line no-unused-vars
 import * as API from './api.js'
-import { ShardFetcher } from '../shard.js'
+import { ShardFetcher, isPrintableASCII } from '../shard.js'
 import * as Shard from '../shard.js'
 import * as BatcherShard from './shard.js'
 
@@ -64,95 +64,105 @@ class Batcher {
  * @returns {Promise<void>}
  */
 export const put = async (blocks, shard, key, value) => {
+  if (shard.keyChars !== Shard.KeyCharsASCII) {
+    throw new Error(`unsupported key character set: ${shard.keyChars}`)
+  }
+  if (!isPrintableASCII(key)) {
+    throw new Error('key contains non-ASCII characters')
+  }
+  // ensure utf8 encoded key is smaller than max
+  if (new TextEncoder().encode(key).length > shard.maxKeySize) {
+    throw new Error(`UTF-8 encoded key exceeds max size of ${shard.maxKeySize} bytes`)
+  }
+
   const shards = new ShardFetcher(blocks)
-  const dest = await traverse(shards, key, shard)
+  const dest = await traverse(shards, shard, key)
   if (dest.shard !== shard) {
     shard = dest.shard
     key = dest.key
   }
 
   /** @type {API.BatcherShardEntry} */
-  let entry = [key, value]
-  /** @type {API.BatcherShard|undefined} */
-  let batcher
+  let entry = [dest.key, value]
+  let targetEntries = [...dest.shard.entries]
 
-  // if the key in this shard is longer than allowed, then we need to make some
-  // intermediate shards.
-  if (key.length > shard.maxKeyLength) {
-    const pfxskeys = Array.from(Array(Math.ceil(key.length / shard.maxKeyLength)), (_, i) => {
-      const start = i * shard.maxKeyLength
-      return {
-        prefix: shard.prefix + key.slice(0, start),
-        key: key.slice(start, start + shard.maxKeyLength)
-      }
-    })
+  for (const [i, e] of targetEntries.entries()) {
+    const [k, v] = e
 
-    entry = [pfxskeys[pfxskeys.length - 1].key, value]
-    batcher = BatcherShard.create({
-      entries: [entry],
-      prefix: pfxskeys[pfxskeys.length - 1].prefix,
-      ...Shard.configure(shard)
-    })
+    // is this just a replace?
+    if (k === dest.key) break
 
-    for (let i = pfxskeys.length - 2; i > 0; i--) {
-      entry = [pfxskeys[i].key, [batcher]]
-      batcher = BatcherShard.create({
-        entries: [entry],
-        prefix: pfxskeys[i].prefix,
-        ...Shard.configure(shard)
-      })
+    // do we need to shard this entry?
+    const shortest = k.length < dest.key.length ? k : dest.key
+    const other = shortest === k ? dest.key : k
+    let common = ''
+    for (const char of shortest) {
+      const next = common + char
+      if (!other.startsWith(next)) break
+      common = next
     }
+    if (common.length) {
+      /** @type {API.ShardEntry[]} */
+      let entries = []
 
-    entry = [pfxskeys[0].key, [batcher]]
+      // if the existing entry key or new key is equal to the common prefix,
+      // then the existing value / new value needs to persist in the parent
+      // shard. Otherwise they persist in this new shard.
+      if (common !== dest.key) {
+        entries = Shard.putEntry(entries, [dest.key.slice(common.length), value])
+      }
+      if (common !== k) {
+        entries = Shard.putEntry(entries, asShardEntry([k.slice(common.length), v]))
+      }
+
+      let child = BatcherShard.create({
+        ...Shard.configure(dest.shard),
+        prefix: dest.shard.prefix + common,
+        entries
+      })
+  
+      // need to spread as access by index does not consider utf-16 surrogates
+      const commonChars = [...common]
+
+      // create parent shards for each character of the common prefix
+      for (let i = commonChars.length - 1; i > 0; i--) {
+        /** @type {API.ShardEntryShardValue | API.ShardEntryShardAndValueValue} */
+        let parentValue
+        // if the first iteration and the existing entry key is equal to the
+        // common prefix, then existing value needs to persist in this parent
+        if (i === commonChars.length - 1 && common === k) {
+          if (Array.isArray(v)) throw new Error('found a shard link when expecting a value')
+          parentValue = [child, v]
+        } else if (i === commonChars.length - 1 && common === dest.key) {
+          parentValue = [child, value]
+        } else {
+          parentValue = [child]
+        }
+        const parent = BatcherShard.create({
+          ...Shard.configure(dest.shard),
+          prefix: dest.shard.prefix + commonChars.slice(0, i).join(''),
+          entries: [[commonChars[i], parentValue]]
+        })
+        child = parent
+      }
+
+      // remove the sharded entry
+      targetEntries.splice(i, 1)
+
+      // create the entry that will be added to target
+      if (commonChars.length === 1 && common === k) {
+        if (Array.isArray(v)) throw new Error('found a shard link when expecting a value')
+        entry = [commonChars[0], [child, v]]
+      } else if (commonChars.length === 1 && common === dest.key) {
+        entry = [commonChars[0], [child, value]]
+      } else {
+        entry = [commonChars[0], [child]]
+      }
+      break
+    }
   }
 
-  shard.entries = Shard.putEntry(asShardEntries(shard.entries), asShardEntry(entry))
-
-  // TODO: adjust size automatically
-  const size = BatcherShard.encodedLength(shard)
-  if (size > shard.maxSize) {
-    const common = Shard.findCommonPrefix(
-      asShardEntries(shard.entries),
-      entry[0]
-    )
-    if (!common) throw new Error('shard limit reached')
-    const { prefix } = common
-    /** @type {API.BatcherShardEntry[]} */
-    const matches = common.matches
-
-    const entries = matches
-      .filter(m => m[0] !== prefix)
-      .map(m => {
-        m = [...m]
-        m[0] = m[0].slice(prefix.length)
-        return m
-      })
-
-    const batcher = BatcherShard.create({
-      entries,
-      prefix: shard.prefix + prefix,
-      ...Shard.configure(shard)
-    })
-
-    /** @type {API.ShardEntryShardValue | API.ShardEntryShardAndValueValue} */
-    let value
-    const pfxmatch = matches.find(m => m[0] === prefix)
-    if (pfxmatch) {
-      if (Array.isArray(pfxmatch[1])) {
-        // should not happen! all entries with this prefix should have been
-        // placed within this shard already.
-        throw new Error(`expected "${prefix}" to be a shard value but found a shard link`)
-      }
-      value = [batcher, pfxmatch[1]]
-    } else {
-      value = [batcher]
-    }
-
-    shard.entries = Shard.putEntry(
-      asShardEntries(shard.entries.filter(e => matches.every(m => e[0] !== m[0]))),
-      asShardEntry([prefix, value])
-    )
-  }
+  shard.entries = Shard.putEntry(asShardEntries(targetEntries), asShardEntry(entry))
 }
 
 /**
@@ -160,11 +170,11 @@ export const put = async (blocks, shard, key, value) => {
  * key.
  *
  * @param {ShardFetcher} shards
- * @param {string} key
  * @param {API.BatcherShard} shard
+ * @param {string} key
  * @returns {Promise<{ shard: API.BatcherShard, key: string }>}
  */
-export const traverse = async (shards, key, shard) => {
+export const traverse = async (shards, shard, key) => {
   for (let i = 0; i < shard.entries.length; i++) {
     const [k, v] = shard.entries[i]
     if (key <= k) break
@@ -173,9 +183,9 @@ export const traverse = async (shards, key, shard) => {
         const blk = await shards.get(v[0])
         const batcher = BatcherShard.create({ base: blk, ...blk.value })
         shard.entries[i] = [k, v[1] == null ? [batcher] : [batcher, v[1]]]
-        return traverse(shards, key.slice(k.length), batcher)
+        return traverse(shards, batcher, key.slice(k.length))
       }
-      return traverse(shards, key.slice(k.length), v[0])
+      return traverse(shards, v[0], key.slice(k.length))
     }
   }
   return { shard, key }

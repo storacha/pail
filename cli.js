@@ -2,19 +2,19 @@
 import fs from 'fs'
 import os from 'os'
 import { join } from 'path'
-import { Readable } from 'stream'
+import { Readable, Writable } from 'stream'
 import sade from 'sade'
 import { CID } from 'multiformats/cid'
-import { CarIndexedReader, CarReader, CarWriter } from '@ipld/car'
+import { CARReaderStream, CARWriterStream } from 'carstream'
 import clc from 'cli-color'
 import archy from 'archy'
 // eslint-disable-next-line no-unused-vars
 import * as API from './src/api.js'
-import { put, get, del, entries } from './src/v1/index.js'
-import { ShardFetcher, ShardBlock } from './src/v1/shard.js'
-import { MaxShardSize } from './src/shard.js'
+import { put, get, del, entries } from './src/index.js'
+import { ShardFetcher, ShardBlock, isShardLink } from './src/shard.js'
 import { difference } from './src/diff.js'
 import { merge } from './src/merge.js'
+import { MemoryBlockstore, MultiBlockFetcher } from './src/block.js'
 
 const cli = sade('pail')
   .option('--path', 'Path to data store.', './pail.car')
@@ -22,77 +22,64 @@ const cli = sade('pail')
 cli.command('put <key> <value>')
   .describe('Put a value (a CID) for the given key. If the key exists it\'s value is overwritten.')
   .alias('set')
-  .option('--max-shard-size', 'Maximum shard size in bytes.', MaxShardSize)
   .action(async (key, value, opts) => {
-    const maxShardSize = opts['max-shard-size'] ?? MaxShardSize
-    const blocks = await openPail(opts.path, { maxSize: maxShardSize })
-    const roots = await blocks.getRoots()
-    // @ts-expect-error
-    const { root, additions, removals } = await put(blocks, roots[0], key, CID.parse(value))
+    const { root: prevRoot, blocks } = await openPail(opts.path)
+    const { root, additions, removals } = await put(blocks, prevRoot, key, CID.parse(value))
     await updatePail(opts.path, blocks, root, { additions, removals })
 
-    console.log(clc.red(`--- ${roots[0]}`))
+    console.log(clc.red(`--- ${prevRoot}`))
     console.log(clc.green(`+++ ${root}`))
     console.log(clc.magenta('@@ -1 +1 @@'))
     additions.forEach(b => console.log(clc.green(`+${b.cid}`)))
     removals.forEach(b => console.log(clc.red(`-${b.cid}`)))
-    await closePail(blocks)
   })
 
 cli.command('get <key>')
   .describe('Get the stored value for the given key from the pail. If the key is not found, `undefined` is returned.')
   .action(async (key, opts) => {
-    const blocks = await openPail(opts.path)
-    // @ts-expect-error
-    const value = await get(blocks, (await blocks.getRoots())[0], key)
+    const { root, blocks } = await openPail(opts.path)
+    const value = await get(blocks, root, key)
     if (value) console.log(value.toString())
-    await closePail(blocks)
   })
 
 cli.command('del <key>')
   .describe('Delete the value for the given key from the pail. If the key is not found no operation occurs.')
   .alias('delete', 'rm', 'remove')
   .action(async (key, opts) => {
-    const blocks = await openPail(opts.path)
-    const roots = await blocks.getRoots()
-    // @ts-expect-error
-    const { root, additions, removals } = await del(blocks, roots[0], key)
+    const { root: prevRoot, blocks } = await openPail(opts.path)
+    const { root, additions, removals } = await del(blocks, prevRoot, key)
     await updatePail(opts.path, blocks, root, { additions, removals })
 
-    console.log(clc.red(`--- ${roots[0]}`))
+    console.log(clc.red(`--- ${prevRoot}`))
     console.log(clc.green(`+++ ${root}`))
     console.log(clc.magenta('@@ -1 +1 @@'))
     additions.forEach(b => console.log(clc.green(`+ ${b.cid}`)))
     removals.forEach(b => console.log(clc.red(`- ${b.cid}`)))
-    await closePail(blocks)
   })
 
 cli.command('ls')
   .describe('List entries in the pail.')
   .alias('list')
   .option('-p, --prefix', 'Key prefix to filter by.')
+  .option('--gt', 'Filter results by keys greater than this string.')
+  .option('--lt', 'Filter results by keys less than this string.')
   .option('--json', 'Format output as newline delimted JSON.')
   .action(async (opts) => {
-    const blocks = await openPail(opts.path)
-    const root = (await blocks.getRoots())[0]
+    const { root, blocks } = await openPail(opts.path)
     let n = 0
-    // @ts-expect-error
-    for await (const [k, v] of entries(blocks, root, { prefix: opts.prefix })) {
+    for await (const [k, v] of entries(blocks, root, { prefix: opts.prefix, gt: opts.gt, lt: opts.lt })) {
       console.log(opts.json ? JSON.stringify({ key: k, value: v.toString() }) : `${k}\t${v}`)
       n++
     }
     if (!opts.json) console.log(`total ${n}`)
-    await closePail(blocks)
   })
 
 cli.command('tree')
   .describe('Visualise the pail.')
+  .alias('vis')
   .action(async (opts) => {
-    const blocks = await openPail(opts.path)
-    const root = (await blocks.getRoots())[0]
-    // @ts-expect-error
+    const { root, blocks } = await openPail(opts.path)
     const shards = new ShardFetcher(blocks)
-    // @ts-expect-error
     const rshard = await shards.get(root)
 
     /** @type {archy.Data} */
@@ -119,27 +106,19 @@ cli.command('tree')
     }
 
     console.log(archy(archyRoot))
-    await closePail(blocks)
   })
 
 cli.command('diff <path>')
   .describe('Find the differences between this pail and the passed pail.')
   .option('-k, --keys', 'Output key/value diff.')
   .action(async (path, opts) => {
-    const [ablocks, bblocks] = await Promise.all([openPail(opts.path), openPail(path)])
-    const [aroot, broot] = await Promise.all([ablocks, bblocks].map(async blocks => {
-      return /** @type {API.ShardLink} */((await blocks.getRoots())[0])
-    }))
+    const [
+      { root: aroot, blocks: ablocks },
+      { root: broot, blocks: bblocks }
+    ] = await Promise.all([openPail(opts.path), openPail(path)])
     if (aroot.toString() === broot.toString()) return
 
-    const fetcher = {
-      async get (cid) {
-        const blk = await ablocks.get(cid)
-        if (blk) return blk
-        return bblocks.get(cid)
-      }
-    }
-    // @ts-expect-error CarReader is not BlockFetcher
+    const fetcher = new MultiBlockFetcher(ablocks, bblocks)
     const { shards: { additions, removals }, keys } = await difference(fetcher, aroot, broot)
 
     console.log(clc.red(`--- ${aroot}`))
@@ -155,27 +134,18 @@ cli.command('diff <path>')
       additions.forEach(b => console.log(clc.green(`+ ${b.cid}`)))
       removals.forEach(b => console.log(clc.red(`- ${b.cid}`)))
     }
-
-    await Promise.all([closePail(ablocks), closePail(bblocks)])
   })
 
 cli.command('merge <path>')
   .describe('Merge the passed pail into this pail.')
   .action(async (path, opts) => {
-    const [ablocks, bblocks] = await Promise.all([openPail(opts.path), openPail(path)])
-    const [aroot, broot] = await Promise.all([ablocks, bblocks].map(async blocks => {
-      return /** @type {API.ShardLink} */((await blocks.getRoots())[0])
-    }))
+    const [
+      { root: aroot, blocks: ablocks },
+      { root: broot, blocks: bblocks }
+    ] = await Promise.all([openPail(opts.path), openPail(path)])
     if (aroot.toString() === broot.toString()) return
 
-    const fetcher = {
-      async get (cid) {
-        const blk = await ablocks.get(cid)
-        if (blk) return blk
-        return bblocks.get(cid)
-      }
-    }
-    // @ts-expect-error CarReader is not BlockFetcher
+    const fetcher = new MultiBlockFetcher(ablocks, bblocks)
     const { root, additions, removals } = await merge(fetcher, aroot, [broot])
 
     await updatePail(opts.path, ablocks, root, { additions, removals })
@@ -185,65 +155,53 @@ cli.command('merge <path>')
     console.log(clc.magenta('@@ -1 +1 @@'))
     additions.forEach(b => console.log(clc.green(`+ ${b.cid}`)))
     removals.forEach(b => console.log(clc.red(`- ${b.cid}`)))
-
-    await Promise.all([closePail(ablocks), closePail(bblocks)])
   })
 
 cli.parse(process.argv)
 
 /**
  * @param {string} path
- * @param {{ maxSize?: number }} [config]
- * @returns {Promise<import('@ipld/car/api').CarReader>}
+ * @returns {Promise<{ root: API.ShardLink, blocks: MemoryBlockstore }>}
  */
-async function openPail (path, config) {
+async function openPail (path) {
+  const blocks = new MemoryBlockstore()
   try {
-    return await CarIndexedReader.fromFile(path)
+    const carReader = new CARReaderStream()
+    const readable = /** @type {ReadableStream<Uint8Array>} */ (Readable.toWeb(fs.createReadStream(path)))
+    await readable.pipeThrough(carReader).pipeTo(new WritableStream({ write: b => blocks.put(b.cid, b.bytes) }))
+    const header = await carReader.getHeader()
+    if (!isShardLink(header.roots[0])) throw new Error(`not a shard: ${header.roots[0]}`)
+    return { root: header.roots[0], blocks }
   } catch (err) {
     if (err.code !== 'ENOENT') throw new Error('failed to open bucket', { cause: err })
-    const rootblk = await ShardBlock.create(config)
-    const { writer, out } = CarWriter.create(rootblk.cid)
-    writer.put(rootblk)
-    writer.close()
-    return CarReader.fromIterable(out)
-  }
-}
-
-/** @param {import('@ipld/car/api').CarReader} reader */
-async function closePail (reader) {
-  if (reader instanceof CarIndexedReader) {
-    await reader.close()
+    const rootblk = await ShardBlock.create()
+    blocks.put(rootblk.cid, rootblk.bytes)
+    return { root: rootblk.cid, blocks }
   }
 }
 
 /**
  * @param {string} path
- * @param {import('@ipld/car/api').CarReader} reader
+ * @param {MemoryBlockstore} blocks
  * @param {API.ShardLink} root
  * @param {API.ShardDiff} diff
  */
-async function updatePail (path, reader, root, { additions, removals }) {
-  // @ts-expect-error
-  const { writer, out } = CarWriter.create(root)
+async function updatePail (path, blocks, root, { additions, removals }) {
   const tmp = join(os.tmpdir(), `pail${Date.now()}.car`)
-
-  const finishPromise = new Promise(resolve => {
-    Readable.from(out).pipe(fs.createWriteStream(tmp)).on('finish', resolve)
-  })
-
-  // put new blocks
-  for (const b of additions) {
-    await writer.put(b)
-  }
-  // put old blocks without removals
-  for await (const b of reader.blocks()) {
-    if (removals.some(r => b.cid.toString() === r.cid.toString())) {
-      continue
+  const iterator = blocks.entries()
+  const readable = new ReadableStream({
+    start (controller) {
+      for (const b of additions) controller.enqueue(b)
+    },
+    pull (controller) {
+      for (const b of iterator) {
+        if (removals.some(r => b.cid.toString() === r.cid.toString())) continue
+        return controller.enqueue(b)
+      }
+      controller.close()
     }
-    await writer.put(b)
-  }
-  await writer.close()
-  await finishPromise
+  })
+  await readable.pipeThrough(new CARWriterStream([root])).pipeTo(Writable.toWeb(fs.createWriteStream(tmp)))
 
   const old = `${path}-${new Date().toISOString()}`
   try {

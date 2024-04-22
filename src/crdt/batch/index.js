@@ -21,20 +21,22 @@ class Batcher {
    * @param {API.EventLink<API.Operation>[]} init.head Merkle clock head.
    * @param {API.BatcherShardEntry[]} init.entries The entries in this shard.
    * @param {string} init.prefix Key prefix.
-   * @param {number} init.maxSize
-   * @param {number} init.maxKeyLength
+   * @param {number} init.version Shard compatibility version.
+   * @param {string} init.keyChars Characters allowed in keys, referring to a known character set.
+   * @param {number} init.maxKeySize Max key size in bytes.
    * @param {API.ShardBlockView} init.base Original shard this batcher is based on.
    * @param {API.ShardBlockView[]} init.additions Additions to include in the committed batch.
    * @param {API.ShardBlockView[]} init.removals Removals to include in the committed batch.
    */
-  constructor ({ blocks, head, entries, prefix, maxSize, maxKeyLength, base, additions, removals }) {
+  constructor ({ blocks, head, entries, prefix, version, keyChars, maxKeySize, base, additions, removals }) {
     this.blocks = blocks
     this.head = head
     this.prefix = prefix
     this.entries = [...entries]
     this.base = base
-    this.maxSize = maxSize
-    this.maxKeyLength = maxKeyLength
+    this.version = version
+    this.keyChars = keyChars
+    this.maxKeySize = maxKeySize
     this.additions = additions
     this.removals = removals
     /** @type {API.BatchOperation['ops']} */
@@ -107,9 +109,8 @@ class Batcher {
    * @param {object} init
    * @param {API.BlockFetcher} init.blocks Block storage.
    * @param {API.EventLink<API.Operation>[]} init.head Merkle clock head.
-   * @param {string} init.prefix
    */
-  static async create ({ blocks, head, prefix }) {
+  static async create ({ blocks, head }) {
     const mblocks = new MemoryBlockstore()
     blocks = new MultiBlockFetcher(mblocks, blocks)
 
@@ -120,7 +121,6 @@ class Batcher {
         blocks,
         head,
         entries: [],
-        prefix,
         base,
         additions: [base],
         removals: [],
@@ -139,7 +139,6 @@ class Batcher {
       blocks,
       head,
       entries: base.value.entries,
-      prefix,
       base,
       additions,
       removals,
@@ -153,4 +152,4 @@ class Batcher {
  * @param {API.EventLink<API.Operation>[]} head Merkle clock head.
  * @returns {Promise<API.CRDTBatcher>}
  */
-export const create = (blocks, head) => Batcher.create({ blocks, head, prefix: '' })
+export const create = (blocks, head) => Batcher.create({ blocks, head })
