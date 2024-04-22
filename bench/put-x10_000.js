@@ -4,6 +4,7 @@ import { put } from '../src/index.js'
 import { ShardBlock } from '../src/shard.js'
 import { MemoryBlockstore } from '../src/block.js'
 import { randomCID, randomString, randomInteger } from '../test/helpers.js'
+import { collectMetrics, writePail } from './util.js'
 
 const NUM = 10_000
 
@@ -16,32 +17,40 @@ async function main () {
 
   /** @type {Array<[string, API.UnknownLink]>} */
   const kvs = []
-
   for (let i = 0; i < NUM; i++) {
     const k = randomString(randomInteger(1, 64))
     const v = await randomCID(randomInteger(8, 128))
     kvs.push([k, v])
   }
 
-  console.log('bench')
-  console.time(`put x${NUM}`)
   /** @type {API.ShardLink} */
   let root = rootBlock.cid
-  for (let i = 0; i < kvs.length; i++) {
-    const result = await put(blocks, root, kvs[i][0], kvs[i][1])
-    for (const b of result.additions) {
-      blocks.putSync(b.cid, b.bytes)
+  console.log('bench')
+  console.time(`put x${NUM}`)
+
+  try {
+    for (let i = 0; i < kvs.length; i++) {
+      const result = await put(blocks, root, kvs[i][0], kvs[i][1])
+      for (const b of result.additions) {
+        blocks.putSync(b.cid, b.bytes)
+      }
+      for (const b of result.removals) {
+        blocks.deleteSync(b.cid)
+      }
+      root = result.root
+      if (i % 1000 === 0) {
+        process.stdout.write('.')
+      }
     }
-    for (const b of result.removals) {
-      blocks.deleteSync(b.cid)
-    }
-    root = result.root
-    if (i % 1000 === 0) {
-      process.stdout.write('.')
-    }
+  } catch (err) {
+    console.log('')
+    console.error(err)
+  } finally {
+    console.log('')
+    console.timeEnd(`put x${NUM}`)
+    await writePail(blocks, root)
+    console.log(await collectMetrics(blocks, root))
   }
-  console.log('')
-  console.timeEnd(`put x${NUM}`)
 }
 
 main()

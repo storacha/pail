@@ -9,6 +9,7 @@ import archy from 'archy'
 import * as API from '../src/api.js'
 import { ShardFetcher, decodeBlock } from '../src/shard.js'
 import { MemoryBlockstore } from '../src/block.js'
+import { entries, get, put } from '../src/index.js'
 
 /**
  * @param {number} min
@@ -54,12 +55,11 @@ export async function randomBytes (size) {
 export class Blockstore extends MemoryBlockstore {
   /**
    * @param {import('../src/api.js').ShardLink} cid
-   * @param {string} [prefix]
    */
-  async getShardBlock (cid, prefix) {
+  async getShardBlock (cid) {
     const blk = await this.get(cid)
     assert(blk)
-    return decodeBlock(blk.bytes, prefix)
+    return decodeBlock(blk.bytes)
   }
 }
 
@@ -95,4 +95,61 @@ export const vis = async (blocks, root) => {
   }
 
   console.log(archy(archyRoot))
+}
+
+/**
+ * @param {API.BlockFetcher} blocks
+ * @param {API.ShardLink} root
+ */
+export const materialize = async (blocks, root) => {
+  const shards = new ShardFetcher(blocks)
+  const shard = await shards.get(root)
+  /** @type {any[]} */
+  const entries = []
+  for (const e of shard.value.entries) {
+    if (Array.isArray(e[1])) {
+      const v = [...e[1]]
+      // @ts-expect-error
+      v[0] = await materialize(blocks, e[1][0])
+      entries.push([e[0], v])
+    } else {
+      entries.push([...e])
+    }
+  }
+  return entries
+}
+
+/**
+ * @param {Blockstore} blocks 
+ * @param {API.ShardLink} root 
+ * @param {Array<[string, API.UnknownLink]>} items
+ */
+export const putAll = async (blocks, root, items) => {
+  for (const [k, v] of items) {
+    const res = await put(blocks, root, k, v)
+    for (const b of res.additions) {
+      blocks.putSync(b.cid, b.bytes)
+    }
+    for (const b of res.removals) {
+      blocks.deleteSync(b.cid)
+    }
+    root = res.root
+  }
+  return { root }
+}
+
+/**
+ * @param {MemoryBlockstore} blocks
+ * @param {API.ShardLink} root
+ * @param {Map<string, API.UnknownLink>} data
+ */
+export const verify = async (blocks, root, data) => {
+  for (const [k, v] of data) {
+    const result = await get(blocks, root, k)
+    if (!result) throw new Error(`missing item: "${k}": ${v}`)
+    if (result.toString() !== v.toString()) throw new Error(`incorrect value for ${k}: ${result} !== ${v}`)
+  }
+  let total = 0
+  for await (const _ of entries(blocks, root)) total++
+  if (data.size !== total) throw new Error(`incorrect entry count: ${total} !== ${data.size}`)
 }

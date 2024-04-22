@@ -8,8 +8,8 @@ import * as Batch from '../src/batch/index.js'
 import { Blockstore, randomCID, randomString, vis } from './helpers.js'
 
 describe('batch', () => {
-  it('batches puts (shard on key length)', async () => {
-    const rootblk = await ShardBlock.create({ maxKeyLength: 4 })
+  it('batches puts', async () => {
+    const rootblk = await ShardBlock.create()
     const blocks = new Blockstore()
     await blocks.put(rootblk.cid, rootblk.bytes)
 
@@ -39,45 +39,10 @@ describe('batch', () => {
       assert(value)
       assert.equal(value.toString(), o.value.toString())
     }
-  })
-
-  it('batches puts (shard on max size)', async () => {
-    const rootblk = await ShardBlock.create({ maxSize: 2000 })
-    const blocks = new Blockstore()
-    await blocks.put(rootblk.cid, rootblk.bytes)
-
-    const ops = []
-    for (let i = 0; i < 1000; i++) {
-      ops.push({ type: 'put', key: `test${randomString(10)}`, value: await randomCID() })
-    }
-
-    const batch = await Batch.create(blocks, rootblk.cid)
-    for (const op of ops) {
-      await batch.put(op.key, op.value)
-    }
-    const { root, additions, removals } = await batch.commit()
-
-    for (const b of removals) {
-      blocks.deleteSync(b.cid)
-    }
-    for (const b of additions) {
-      blocks.putSync(b.cid, b.bytes)
-    }
-
-    assert.equal(removals.length, 1)
-    assert.equal(removals[0].cid.toString(), rootblk.cid.toString())
-
-    for (const o of ops) {
-      const value = await Pail.get(blocks, root, o.key)
-      assert(value)
-      assert.equal(value.toString(), o.value.toString())
-    }
-
-    vis(blocks, root)
   })
 
   it('create the same DAG as non-batched puts', async () => {
-    const root = await ShardBlock.create({ maxKeyLength: 4 })
+    const root = await ShardBlock.create()
     const blocks = new Blockstore()
     await blocks.put(root.cid, root.bytes)
 
@@ -106,7 +71,7 @@ describe('batch', () => {
   })
 
   it('error when put after commit', async () => {
-    const root = await ShardBlock.create({ maxKeyLength: 4 })
+    const root = await ShardBlock.create()
     const blocks = new Blockstore()
     await blocks.put(root.cid, root.bytes)
 
@@ -124,7 +89,7 @@ describe('batch', () => {
   })
 
   it('error when commit after commit', async () => {
-    const root = await ShardBlock.create({ maxKeyLength: 4 })
+    const root = await ShardBlock.create()
     const blocks = new Blockstore()
     await blocks.put(root.cid, root.bytes)
 
@@ -142,7 +107,7 @@ describe('batch', () => {
   })
 
   it('traverses existing shards to put values', async () => {
-    const rootblk = await ShardBlock.create({ maxKeyLength: 4 })
+    const rootblk = await ShardBlock.create()
     const blocks = new Blockstore()
     await blocks.put(rootblk.cid, rootblk.bytes)
 

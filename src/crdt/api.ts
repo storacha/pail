@@ -1,7 +1,7 @@
 import { ShardDiff, ShardLink, UnknownLink } from '../api.js'
 import { EventLink, EventBlockView } from '../clock/api.js'
 
-export { BlockFetcher, UnknownLink, ShardBlockView, ShardDiff, ShardLink } from '../api.js'
+export { BlockFetcher, UnknownLink, ShardBlockView, ShardDiff, ShardLink, EntriesOptions } from '../api.js'
 export { EventBlockView, EventLink } from '../clock/api.js'
 
 export interface Result extends ShardDiff {

@@ -28,13 +28,11 @@ export {
 
 export interface BatcherShard extends ShardConfig {
   base?: ShardBlockView
-  prefix: string
   entries: BatcherShardEntry[]
 }
 
 export interface BatcherShardInit extends ShardOptions {
   base?: ShardBlockView
-  prefix?: string
   entries?: BatcherShardEntry[]
 }
 

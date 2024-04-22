@@ -141,4 +141,107 @@ describe('entries', () => {
       assert.equal(results[i][0], key)
     }
   })
+
+  it('lists entries by key less than string', async () => {
+    const empty = await ShardBlock.create()
+    const blocks = new Blockstore()
+    await blocks.put(empty.cid, empty.bytes)
+
+    /** @type {Array<[string, API.UnknownLink]>} */
+    const testdata = [
+      ['cccc', await randomCID(32)],
+      ['deee', await randomCID(32)],
+      ['dooo', await randomCID(32)],
+      ['beee', await randomCID(32)]
+    ]
+
+    /** @type {API.ShardLink} */
+    let root = empty.cid
+    for (const [k, v] of testdata) {
+      const res = await put(blocks, root, k, v)
+      for (const b of res.additions) {
+        await blocks.put(b.cid, b.bytes)
+      }
+      root = res.root
+    }
+
+    const lt = 'doo'
+    const results = []
+    for await (const entry of entries(blocks, root, { lt })) {
+      results.push(entry)
+    }
+
+    for (const [i, key] of testdata.map(d => d[0]).filter(k => k < lt).sort().entries()) {
+      assert.equal(results[i][0], key)
+    }
+  })
+
+  it('lists entries by key less than or equal to string', async () => {
+    const empty = await ShardBlock.create()
+    const blocks = new Blockstore()
+    await blocks.put(empty.cid, empty.bytes)
+
+    /** @type {Array<[string, API.UnknownLink]>} */
+    const testdata = [
+      ['cccc', await randomCID(32)],
+      ['deee', await randomCID(32)],
+      ['dooo', await randomCID(32)],
+      ['beee', await randomCID(32)]
+    ]
+
+    /** @type {API.ShardLink} */
+    let root = empty.cid
+    for (const [k, v] of testdata) {
+      const res = await put(blocks, root, k, v)
+      for (const b of res.additions) {
+        await blocks.put(b.cid, b.bytes)
+      }
+      root = res.root
+    }
+
+    const lte = 'dooo'
+    const results = []
+    for await (const entry of entries(blocks, root, { lte })) {
+      results.push(entry)
+    }
+
+    for (const [i, key] of testdata.map(d => d[0]).filter(k => k <= lte).sort().entries()) {
+      assert.equal(results[i][0], key)
+    }
+  })
+
+  it('lists entries by key greater than and less than or equal to string', async () => {
+    const empty = await ShardBlock.create()
+    const blocks = new Blockstore()
+    await blocks.put(empty.cid, empty.bytes)
+
+    /** @type {Array<[string, API.UnknownLink]>} */
+    const testdata = [
+      ['cccc', await randomCID(32)],
+      ['deee', await randomCID(32)],
+      ['dooo', await randomCID(32)],
+      ['beee', await randomCID(32)]
+    ]
+
+    /** @type {API.ShardLink} */
+    let root = empty.cid
+    for (const [k, v] of testdata) {
+      const res = await put(blocks, root, k, v)
+      for (const b of res.additions) {
+        await blocks.put(b.cid, b.bytes)
+      }
+      root = res.root
+    }
+
+    const gt = 'c'
+    const lte = 'deee'
+    const results = []
+    for await (const entry of entries(blocks, root, { gt, lte })) {
+      results.push(entry)
+    }
+
+    for (const [i, key] of testdata.map(d => d[0]).filter(k => k > gt && k <= lte).sort().entries()) {
+      assert.equal(results[i][0], key)
+    }
+  })
 })

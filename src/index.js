@@ -1,6 +1,6 @@
 // eslint-disable-next-line no-unused-vars
 import * as API from './api.js'
-import { ShardFetcher } from './shard.js'
+import { ShardFetcher, isPrintableASCII } from './shard.js'
 import * as Shard from './shard.js'
 
 /**
@@ -16,80 +16,104 @@ import * as Shard from './shard.js'
 export const put = async (blocks, root, key, value) => {
   const shards = new ShardFetcher(blocks)
   const rshard = await shards.get(root)
+
+  if (rshard.value.keyChars !== Shard.KeyCharsASCII) {
+    throw new Error(`unsupported key character set: ${rshard.value.keyChars}`)
+  }
+  if (!isPrintableASCII(key)) {
+    throw new Error('key contains non-ASCII characters')
+  }
+  // ensure utf8 encoded key is smaller than max
+  if (new TextEncoder().encode(key).length > rshard.value.maxKeySize) {
+    throw new Error(`UTF-8 encoded key exceeds max size of ${rshard.value.maxKeySize} bytes`)
+  }
+
   const path = await traverse(shards, rshard, key)
   const target = path[path.length - 1]
-  const skey = key.slice(target.prefix.length) // key within the shard
+  const skey = key.slice(target.value.prefix.length) // key within the shard
 
   /** @type {API.ShardEntry} */
   let entry = [skey, value]
+  let targetEntries = [...target.value.entries]
 
   /** @type {API.ShardBlockView[]} */
   const additions = []
 
-  // if the key in this shard is longer than allowed, then we need to make some
-  // intermediate shards.
-  if (skey.length > target.value.maxKeyLength) {
-    const pfxskeys = Array.from(Array(Math.ceil(skey.length / target.value.maxKeyLength)), (_, i) => {
-      const start = i * target.value.maxKeyLength
-      return {
-        prefix: target.prefix + skey.slice(0, start),
-        skey: skey.slice(start, start + target.value.maxKeyLength)
+  for (const [i, e] of targetEntries.entries()) {
+    const [k, v] = e
+
+    // is this just a replace?
+    if (k === skey) break
+
+    // do we need to shard this entry?
+    const shortest = k.length < skey.length ? k : skey
+    const other = shortest === k ? skey : k
+    let common = ''
+    for (const char of shortest) {
+      const next = common + char
+      if (!other.startsWith(next)) break
+      common = next
+    }
+    if (common.length) {
+      /** @type {API.ShardEntry[]} */
+      let entries = []
+
+      // if the existing entry key or new key is equal to the common prefix,
+      // then the existing value / new value needs to persist in the parent
+      // shard. Otherwise they persist in this new shard.
+      if (common !== skey) {
+        entries = Shard.putEntry(entries, [skey.slice(common.length), value])
       }
-    })
+      if (common !== k) {
+        entries = Shard.putEntry(entries, [k.slice(common.length), v])
+      }
 
-    let child = await Shard.encodeBlock(
-      Shard.withEntries([[pfxskeys[pfxskeys.length - 1].skey, value]], target.value),
-      pfxskeys[pfxskeys.length - 1].prefix
-    )
-    additions.push(child)
-
-    for (let i = pfxskeys.length - 2; i > 0; i--) {
-      child = await Shard.encodeBlock(
-        Shard.withEntries([[pfxskeys[i].skey, [child.cid]]], target.value),
-        pfxskeys[i].prefix
+      let child = await Shard.encodeBlock(
+        Shard.withEntries(entries, { ...target.value, prefix: target.value.prefix + common })
       )
       additions.push(child)
-    }
+  
+      // need to spread as access by index does not consider utf-16 surrogates
+      const commonChars = [...common]
 
-    entry = [pfxskeys[0].skey, [child.cid]]
-  }
-
-  let shard = Shard.withEntries(Shard.putEntry(target.value.entries, entry), target.value)
-  let child = await Shard.encodeBlock(shard, target.prefix)
-
-  if (child.bytes.length > shard.maxSize) {
-    const common = Shard.findCommonPrefix(shard.entries, entry[0])
-    if (!common) throw new Error('shard limit reached')
-    const { prefix, matches } = common
-    const block = await Shard.encodeBlock(
-      Shard.withEntries(
-        matches
-          .filter(([k]) => k !== prefix)
-          .map(([k, v]) => [k.slice(prefix.length), v]),
-        shard
-      ),
-      target.prefix + prefix
-    )
-    additions.push(block)
-
-    /** @type {API.ShardEntryLinkValue | API.ShardEntryLinkAndValueValue} */
-    let value
-    const pfxmatch = matches.find(([k]) => k === prefix)
-    if (pfxmatch) {
-      if (Array.isArray(pfxmatch[1])) {
-        // should not happen! all entries with this prefix should have been
-        // placed within this shard already.
-        throw new Error(`expected "${prefix}" to be a shard value but found a shard link`)
+      // create parent shards for each character of the common prefix
+      for (let i = commonChars.length - 1; i > 0; i--) {
+        const parentConfig = { ...target.value, prefix: target.value.prefix + commonChars.slice(0, i).join('') }
+        /** @type {API.ShardEntryLinkValue | API.ShardEntryValueValue | API.ShardEntryLinkAndValueValue} */
+        let parentValue
+        // if the first iteration and the existing entry key is equal to the
+        // common prefix, then existing value needs to persist in this parent
+        if (i === commonChars.length - 1 && common === k) {
+          if (Array.isArray(v)) throw new Error('found a shard link when expecting a value')
+          parentValue = [child.cid, v]
+        } else if (i === commonChars.length - 1 && common === skey) {
+          parentValue = [child.cid, value]
+        } else {
+          parentValue = [child.cid]
+        }
+        const parent = await Shard.encodeBlock(Shard.withEntries([[commonChars[i], parentValue]], parentConfig))
+        additions.push(parent)
+        child = parent
       }
-      value = [block.cid, pfxmatch[1]]
-    } else {
-      value = [block.cid]
-    }
 
-    shard.entries = shard.entries.filter(e => matches.every(m => e[0] !== m[0]))
-    shard = Shard.withEntries(Shard.putEntry(shard.entries, [prefix, value]), shard)
-    child = await Shard.encodeBlock(shard, target.prefix)
+      // remove the sharded entry
+      targetEntries.splice(i, 1)
+
+      // create the entry that will be added to target
+      if (commonChars.length === 1 && common === k) {
+        if (Array.isArray(v)) throw new Error('found a shard link when expecting a value')
+        entry = [commonChars[0], [child.cid, v]]
+      } else if (commonChars.length === 1 && common === skey) {
+        entry = [commonChars[0], [child.cid, value]]
+      } else {
+        entry = [commonChars[0], [child.cid]]
+      }
+      break
+    }
   }
+
+  const shard = Shard.withEntries(Shard.putEntry(targetEntries, entry), target.value)
+  let child = await Shard.encodeBlock(shard)
 
   // if no change in the target then we're done
   if (child.cid.toString() === target.cid.toString()) {
@@ -98,10 +122,10 @@ export const put = async (blocks, root, key, value) => {
 
   additions.push(child)
 
-  // path is root -> shard, so work backwards, propagating the new shard CID
+  // path is root -> target, so work backwards, propagating the new shard CID
   for (let i = path.length - 2; i >= 0; i--) {
     const parent = path[i]
-    const key = child.prefix.slice(parent.prefix.length)
+    const key = child.value.prefix.slice(parent.value.prefix.length)
     const value = Shard.withEntries(
       parent.value.entries.map((entry) => {
         const [k, v] = entry
@@ -112,7 +136,7 @@ export const put = async (blocks, root, key, value) => {
       parent.value
     )
 
-    child = await Shard.encodeBlock(value, parent.prefix)
+    child = await Shard.encodeBlock(value)
     additions.push(child)
   }
 
@@ -133,7 +157,7 @@ export const get = async (blocks, root, key) => {
   const rshard = await shards.get(root)
   const path = await traverse(shards, rshard, key)
   const target = path[path.length - 1]
-  const skey = key.slice(target.prefix.length) // key within the shard
+  const skey = key.slice(target.value.prefix.length) // key within the shard
   const entry = target.value.entries.find(([k]) => k === skey)
   if (!entry) return
   return Array.isArray(entry[1]) ? entry[1][1] : entry[1]
@@ -153,7 +177,7 @@ export const del = async (blocks, root, key) => {
   const rshard = await shards.get(root)
   const path = await traverse(shards, rshard, key)
   const target = path[path.length - 1]
-  const skey = key.slice(target.prefix.length) // key within the shard
+  const skey = key.slice(target.value.prefix.length) // key within the shard
 
   const entryidx = target.value.entries.findIndex(([k]) => k === skey)
   if (entryidx === -1) return { root, additions: [], removals: [] }
@@ -192,13 +216,13 @@ export const del = async (blocks, root, key) => {
     }
   }
 
-  let child = await Shard.encodeBlock(shard, path[path.length - 1].prefix)
+  let child = await Shard.encodeBlock(shard)
   additions.push(child)
 
   // path is root -> shard, so work backwards, propagating the new shard CID
   for (let i = path.length - 2; i >= 0; i--) {
     const parent = path[i]
-    const key = child.prefix.slice(parent.prefix.length)
+    const key = child.value.prefix.slice(parent.value.prefix.length)
     const value = Shard.withEntries(
       parent.value.entries.map((entry) => {
         const [k, v] = entry
@@ -209,7 +233,7 @@ export const del = async (blocks, root, key) => {
       parent.value
     )
 
-    child = await Shard.encodeBlock(value, parent.prefix)
+    child = await Shard.encodeBlock(value)
     additions.push(child)
   }
 
@@ -217,18 +241,78 @@ export const del = async (blocks, root, key) => {
 }
 
 /**
+ * @param {API.EntriesOptions} [options]
+ * @returns {options is API.KeyPrefixOption}
+ */
+const isKeyPrefixOption = options => {
+  const opts = options ?? {}
+  return 'prefix' in opts && Boolean(opts.prefix)
+}
+
+/**
+ * @param {API.EntriesOptions} [options]
+ * @returns {options is API.KeyRangeOption}
+ */
+const isKeyRangeOption = options => {
+  const opts = options ?? {}
+  return ('gt' in opts && Boolean(opts.gt)) || ('gte' in opts && Boolean(opts.gte)) || ('lt' in opts && Boolean(opts.lt)) || ('lte' in opts && Boolean(opts.lte))
+}
+
+/**
+ * @param {API.KeyRangeOption} options
+ * @returns {options is API.KeyLowerBoundRangeOption}
+ */
+const isKeyLowerBoundRangeOption = options => ('gt' in options && Boolean(options.gt)) || ('gte' in options && Boolean(options.gte))
+
+/**
+ * @param {API.KeyLowerBoundRangeOption} options
+ * @returns {options is API.KeyLowerBoundRangeInclusiveOption}
+ */
+const isKeyLowerBoundRangeInclusiveOption = options => 'gte' in options && Boolean(options.gte)
+
+/**
+ * @param {API.KeyLowerBoundRangeOption} options
+ * @returns {options is API.KeyLowerBoundRangeExclusiveOption}
+ */
+const isKeyLowerBoundRangeExclusiveOption = options => 'gt' in options && Boolean(options.gt)
+
+/**
+ * @param {API.KeyRangeOption} options
+ * @returns {options is API.KeyUpperBoundRangeOption}
+ */
+const isKeyUpperBoundRangeOption = options => ('lt' in options && Boolean(options.lt)) || ('lte' in options && Boolean(options.lte))
+
+/**
+ * @param {API.KeyUpperBoundRangeOption} options
+ * @returns {options is API.KeyUpperBoundRangeInclusiveOption}
+ */
+const isKeyUpperBoundRangeInclusiveOption = options => 'lte' in options && Boolean(options.lte)
+
+/**
+ * @param {API.KeyUpperBoundRangeOption} options
+ * @returns {options is API.KeyUpperBoundRangeExclusiveOption}
+ */
+const isKeyUpperBoundRangeExclusiveOption = options => 'lt' in options && Boolean(options.lt)
+
+/**
  * List entries in the bucket.
  *
  * @param {API.BlockFetcher} blocks Bucket block storage.
  * @param {API.ShardLink} root CID of the root node of the bucket.
- * @param {object} [options]
- * @param {string} [options.prefix] Filter results to entries with keys prefixed with this string.
- * @param {string} [options.gt] Filter results to entries with keys greater than this string.
- * @param {string} [options.gte] Filter results to entries with keys greater than or equal to this string.
+ * @param {API.EntriesOptions} [options]
  * @returns {AsyncIterableIterator<API.ShardValueEntry>}
  */
-export const entries = async function * (blocks, root, options = {}) {
-  const { prefix, gt, gte } = options
+export const entries = async function * (blocks, root, options) {
+  const hasKeyPrefix = isKeyPrefixOption(options)
+  const hasKeyRange = isKeyRangeOption(options)
+  const hasKeyLowerBoundRange = hasKeyRange && isKeyLowerBoundRangeOption(options)
+  const hasKeyLowerBoundRangeInclusive = hasKeyLowerBoundRange && isKeyLowerBoundRangeInclusiveOption(options)
+  const hasKeyLowerBoundRangeExclusive = hasKeyLowerBoundRange && isKeyLowerBoundRangeExclusiveOption(options)
+  const hasKeyUpperBoundRange = hasKeyRange && isKeyUpperBoundRangeOption(options)
+  const hasKeyUpperBoundRangeInclusive = hasKeyUpperBoundRange && isKeyUpperBoundRangeInclusiveOption(options)
+  const hasKeyUpperBoundRangeExclusive = hasKeyUpperBoundRange && isKeyUpperBoundRangeExclusiveOption(options)
+  const hasKeyUpperAndLowerBoundRange = hasKeyLowerBoundRange && hasKeyUpperBoundRange
+
   const shards = new ShardFetcher(blocks)
   const rshard = await shards.get(root)
 
@@ -236,49 +320,55 @@ export const entries = async function * (blocks, root, options = {}) {
     /** @returns {AsyncIterableIterator<API.ShardValueEntry>} */
     async function * ents (shard) {
       for (const entry of shard.value.entries) {
-        const key = shard.prefix + entry[0]
+        const key = shard.value.prefix + entry[0]
 
+        // if array, this is a link to a shard
         if (Array.isArray(entry[1])) {
           if (entry[1][1]) {
             if (
-              (prefix && key.startsWith(prefix)) ||
-              (gt && key > gt) ||
-              (gte && key >= gte) ||
-              (!prefix && !gt && !gte)
+              (hasKeyPrefix && key.startsWith(options.prefix)) ||
+              (hasKeyUpperAndLowerBoundRange && (
+                ((hasKeyLowerBoundRangeExclusive && key > options.gt) || (hasKeyLowerBoundRangeInclusive && key >= options.gte)) &&
+                ((hasKeyUpperBoundRangeExclusive && key < options.lt) || (hasKeyUpperBoundRangeInclusive && key <= options.lte))
+              )) ||
+              (hasKeyLowerBoundRangeExclusive && key > options.gt) ||
+              (hasKeyLowerBoundRangeInclusive && key >= options.gte) ||
+              (hasKeyUpperBoundRangeExclusive && key < options.lt) ||
+              (hasKeyUpperBoundRangeInclusive && key <= options.lte) ||
+              (!hasKeyPrefix && !hasKeyRange)
             ) {
               yield [key, entry[1][1]]
             }
           }
 
-          if (prefix) {
-            if (prefix.length <= key.length && !key.startsWith(prefix)) {
+          if (hasKeyPrefix) {
+            if (options.prefix.length <= key.length && !key.startsWith(options.prefix)) {
               continue
             }
-            if (prefix.length > key.length && !prefix.startsWith(key)) {
+            if (options.prefix.length > key.length && !options.prefix.startsWith(key)) {
               continue
             }
-          } else if (gt) {
-            if (gt.length <= key.length && !key.startsWith(gt)) {
-              continue
-            }
-            if (gt.length > key.length && !gt.startsWith(key)) {
-              continue
-            }
-          } else if (gte) {
-            if (gte.length <= key.length && !key.startsWith(gte)) {
-              continue
-            }
-            if (gte.length > key.length && !gte.startsWith(key)) {
-              continue
-            }
+          } else if (
+            (hasKeyLowerBoundRangeExclusive && (trunc(key, Math.min(key.length, options.gt.length)) < trunc(options.gt, Math.min(key.length, options.gt.length)))) ||
+            (hasKeyLowerBoundRangeInclusive && (trunc(key, Math.min(key.length, options.gte.length)) < trunc(options.gte, Math.min(key.length, options.gte.length)))) ||
+            (hasKeyUpperBoundRangeExclusive && (trunc(key, Math.min(key.length, options.lt.length)) > trunc(options.lt, Math.min(key.length, options.lt.length)))) ||
+            (hasKeyUpperBoundRangeInclusive && (trunc(key, Math.min(key.length, options.lte.length)) > trunc(options.lte, Math.min(key.length, options.lte.length))))
+          ) {
+            continue
           }
-          yield * ents(await shards.get(entry[1][0], key))
+          yield * ents(await shards.get(entry[1][0]))
         } else {
           if (
-            (prefix && key.startsWith(prefix)) ||
-            (gt && key > gt) ||
-            (gte && key >= gte) ||
-            (!prefix && !gt && !gte)
+            (hasKeyPrefix && key.startsWith(options.prefix)) ||
+            (hasKeyRange && hasKeyUpperAndLowerBoundRange && (
+              ((hasKeyLowerBoundRangeExclusive && key > options.gt) || (hasKeyLowerBoundRangeInclusive && key >= options.gte)) &&
+              ((hasKeyUpperBoundRangeExclusive && key < options.lt) || (hasKeyUpperBoundRangeInclusive && key <= options.lte))
+            )) ||
+            (hasKeyRange && !hasKeyUpperAndLowerBoundRange && (
+              (hasKeyLowerBoundRangeExclusive && key > options.gt) || (hasKeyLowerBoundRangeInclusive && key >= options.gte) ||
+              (hasKeyUpperBoundRangeExclusive && key < options.lt) || (hasKeyUpperBoundRangeInclusive && key <= options.lte)
+            )) ||
+            (!hasKeyPrefix && !hasKeyRange)
           ) {
             yield [key, entry[1]]
           }
@@ -287,6 +377,12 @@ export const entries = async function * (blocks, root, options = {}) {
     }
   )(rshard)
 }
+
+/**
+ * @param {string} str
+ * @param {number} len
+ */
+const trunc = (str, len) => str.length <= len ? str : str.slice(0, len)
 
 /**
  * Traverse from the passed shard block to the target shard block using the
@@ -302,7 +398,7 @@ const traverse = async (shards, shard, key) => {
   for (const [k, v] of shard.value.entries) {
     if (key === k) return [shard]
     if (key.startsWith(k) && Array.isArray(v)) {
-      const path = await traverse(shards, await shards.get(v[0], shard.prefix + k), key.slice(k.length))
+      const path = await traverse(shards, await shards.get(v[0]), key.slice(k.length))
       return [shard, ...path]
     }
   }

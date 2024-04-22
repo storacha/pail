@@ -23,9 +23,7 @@ export interface Shard extends ShardConfig {
 
 export type ShardLink = Link<Shard, typeof dagCBOR.code, typeof sha256.code, 1>
 
-export interface ShardBlockView extends BlockView<Shard, typeof dagCBOR.code, typeof sha256.code, 1> {
-  prefix: string
-}
+export interface ShardBlockView extends BlockView<Shard, typeof dagCBOR.code, typeof sha256.code, 1> {}
 
 export interface ShardDiff {
   additions: ShardBlockView[]
@@ -38,10 +36,55 @@ export interface BlockFetcher {
 }
 
 export interface ShardConfig {
-  /** Max encoded shard size in bytes - default 512 KiB. */
-  maxSize: number
-  /** Max key length (in UTF-8 encoded characters) - default 64. */
-  maxKeyLength: number
+  /** Shard compatibility version. */
+  version: number
+  /**
+   * Characters allowed in keys, referring to a known character set.
+   * e.g. "ascii" refers to the printable ASCII characters in the code range 32-126.
+   */
+  keyChars: string
+  /** Max key size in bytes - default 4096 bytes. */
+  maxKeySize: number
+  /** The key prefix from the root to this shard. */
+  prefix: string
 }
 
 export type ShardOptions = Partial<ShardConfig>
+
+export interface KeyPrefixOption {
+  /** Filter results to entries with keys prefixed with this string. */
+  prefix: string
+}
+
+export type KeyRangeOption =
+  | KeyLowerBoundRangeOption
+  | KeyUpperBoundRangeOption
+  | (KeyLowerBoundRangeOption & KeyUpperBoundRangeOption)
+
+export type KeyLowerBoundRangeOption =
+  | KeyLowerBoundRangeExclusiveOption
+  | KeyLowerBoundRangeInclusiveOption
+
+export interface KeyLowerBoundRangeExclusiveOption {
+  gt: string
+}
+
+export interface KeyLowerBoundRangeInclusiveOption {
+  gte: string
+}
+
+export type KeyUpperBoundRangeOption =
+  | KeyUpperBoundRangeExclusiveOption
+  | KeyUpperBoundRangeInclusiveOption
+
+export interface KeyUpperBoundRangeExclusiveOption {
+  lt: string
+}
+
+export interface KeyUpperBoundRangeInclusiveOption {
+  lte: string
+}
+
+export type EntriesOptions =
+  | KeyPrefixOption
+  | KeyRangeOption

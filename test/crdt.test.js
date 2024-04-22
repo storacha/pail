@@ -323,10 +323,7 @@ class TestPail {
     return get(this.blocks, this.head, key)
   }
 
-  /**
-   * @param {object} [options]
-   * @param {string} [options.prefix]
-   */
+  /** @param {API.EntriesOptions} [options] */
   async * entries (options) {
     yield * entries(this.blocks, this.head, options)
   }
