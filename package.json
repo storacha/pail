@@ -5,58 +5,6 @@
   "main": "src/index.js",
   "type": "module",
   "types": "./dist/src/index.d.ts",
-  "typesVersions": {
-    "*": {
-      "*": [
-        "dist/*"
-      ],
-      "dist/src/index.d.ts": [
-        "dist/src/index.d.ts"
-      ],
-      "api": [
-        "dist/src/api.d.ts"
-      ],
-      "batch": [
-        "dist/src/batch/index.d.ts"
-      ],
-      "batch/api": [
-        "dist/src/batch/api.d.ts"
-      ],
-      "block": [
-        "dist/src/block.d.ts"
-      ],
-      "clock": [
-        "dist/src/clock/index.d.ts"
-      ],
-      "clock/api": [
-        "dist/src/clock/api.d.ts"
-      ],
-      "crdt": [
-        "dist/src/crdt/index.d.ts"
-      ],
-      "crdt/api": [
-        "dist/src/crdt/api.d.ts"
-      ],
-      "crdt/batch": [
-        "dist/src/crdt/batch/index.d.ts"
-      ],
-      "crdt/batch/api": [
-        "dist/src/crdt/batch/api.d.ts"
-      ],
-      "diff": [
-        "dist/src/diff.d.ts"
-      ],
-      "link": [
-        "dist/src/link.d.ts"
-      ],
-      "merge": [
-        "dist/src/merge.d.ts"
-      ],
-      "shard": [
-        "dist/src/shard.d.ts"
-      ]
-    }
-  },
   "exports": {
     ".": {
       "types": "./dist/src/index.d.ts",
@@ -106,10 +54,6 @@
       "types": "./dist/src/diff.d.ts",
       "import": "./src/diff.js"
     },
-    "./link": {
-      "types": "./dist/src/link.d.ts",
-      "import": "./src/link.js"
-    },
     "./merge": {
       "types": "./dist/src/merge.d.ts",
       "import": "./src/merge.js"
@@ -143,8 +87,8 @@
     "dist"
   ],
   "dependencies": {
-    "@ipld/dag-cbor": "^9.2.0",
-    "multiformats": "^13.1.0"
+    "@ipld/dag-cbor": "^9.2.2",
+    "multiformats": "^13.3.1"
   },
   "devDependencies": {
     "archy": "^1.0.0",
@@ -155,7 +99,7 @@
     "nanoid": "^4.0.0",
     "sade": "^1.8.1",
     "standard": "^17.0.0",
-    "typescript": "^5.0.2"
+    "typescript": "^5.7.3"
   },
   "repository": {
     "type": "git",
