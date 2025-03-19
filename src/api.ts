@@ -1,4 +1,6 @@
-import { Link, UnknownLink, BlockView, Block, Version } from 'multiformats'
+import type { Version } from 'multiformats'
+import type { Link, UnknownLink } from 'multiformats/link/interface'
+import type { Block, BlockView } from 'multiformats/block/interface'
 import { sha256 } from 'multiformats/hashes/sha2'
 import * as dagCBOR from '@ipld/dag-cbor'
 

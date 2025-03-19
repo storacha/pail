@@ -88,7 +88,7 @@
   ],
   "dependencies": {
     "@ipld/dag-cbor": "^9.2.2",
-    "multiformats": "^13.3.1"
+    "multiformats": "^13.3.2"
   },
   "devDependencies": {
     "archy": "^1.0.0",
@@ -99,7 +99,7 @@
     "nanoid": "^4.0.0",
     "sade": "^1.8.1",
     "standard": "^17.0.0",
-    "typescript": "^5.7.3"
+    "typescript": "^5.8.2"
   },
   "repository": {
     "type": "git",
@@ -112,6 +112,11 @@
   "standard": {
     "ignore": [
       "*.ts"
+    ]
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "es5-ext"
     ]
   }
 }
