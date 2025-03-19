@@ -10,5 +10,5 @@ export default defineConfig({
     exclude: ['test/helpers.js'],
     include: ['test/*.js'],
     globals: true
-  },
+  }
 })

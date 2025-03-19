@@ -120,8 +120,8 @@ export const materialize = async (blocks, root) => {
 }
 
 /**
- * @param {Blockstore} blocks 
- * @param {API.ShardLink} root 
+ * @param {Blockstore} blocks
+ * @param {API.ShardLink} root
  * @param {Array<[string, API.UnknownLink]>} items
  */
 export const putAll = async (blocks, root, items) => {
@@ -150,6 +150,7 @@ export const verify = async (blocks, root, data) => {
     if (result.toString() !== v.toString()) throw new Error(`incorrect value for ${k}: ${result} !== ${v}`)
   }
   let total = 0
+  // eslint-disable-next-line no-unused-vars
   for await (const _ of entries(blocks, root)) total++
   if (data.size !== total) throw new Error(`incorrect entry count: ${total} !== ${data.size}`)
 }

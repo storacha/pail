@@ -34,7 +34,7 @@ export const put = async (blocks, root, key, value) => {
 
   /** @type {API.ShardEntry} */
   let entry = [skey, value]
-  let targetEntries = [...target.value.entries]
+  const targetEntries = [...target.value.entries]
 
   /** @type {API.ShardBlockView[]} */
   const additions = []
@@ -72,7 +72,7 @@ export const put = async (blocks, root, key, value) => {
         Shard.withEntries(entries, { ...target.value, prefix: target.value.prefix + common })
       )
       additions.push(child)
-  
+
       // need to spread as access by index does not consider utf-16 surrogates
       const commonChars = [...common]
 

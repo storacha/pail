@@ -33,8 +33,7 @@ export interface ShardDiff {
 }
 
 export interface BlockFetcher {
-  get<T = unknown, C extends number = number, A extends number = number, V extends Version = 1> (link: Link<T, C, A, V>):
-    Promise<Block<T, C, A, V> | undefined>
+  get: <T = unknown, C extends number = number, A extends number = number, V extends Version = 1>(link: Link<T, C, A, V>) => Promise<Block<T, C, A, V> | undefined>
 }
 
 export interface ShardConfig {

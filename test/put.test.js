@@ -1,5 +1,4 @@
 import assert from 'node:assert'
-import { nanoid } from 'nanoid'
 // eslint-disable-next-line no-unused-vars
 import * as API from '../src/api.js'
 import { put } from '../src/index.js'
@@ -135,7 +134,7 @@ describe('put', () => {
       [0, 1, 2, 3, 4],
       [4, 3, 2, 1, 0],
       [1, 2, 4, 0, 3],
-      [2, 0, 3, 4, 1],
+      [2, 0, 3, 4, 1]
     ]
     for (const order of orders) {
       const root = await ShardBlock.create()
@@ -179,7 +178,6 @@ describe('put', () => {
   })
 
   it('put 10,000x', async function () {
-
     const root = await ShardBlock.create()
     const blocks = new Blockstore()
     await blocks.put(root.cid, root.bytes)

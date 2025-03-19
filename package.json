@@ -88,17 +88,15 @@
   ],
   "dependencies": {
     "@ipld/dag-cbor": "^9.2.2",
-    "@vitest/coverage-v8": "^3.0.9",
-    "multiformats": "^13.3.2"
-  },
-  "devDependencies": {
     "archy": "^1.0.0",
-    "c8": "^8.0.1",
     "carstream": "^2.0.0",
     "cli-color": "^2.0.3",
-    "nanoid": "^4.0.0",
-    "sade": "^1.8.1",
-    "standard": "^17.0.0",
+    "multiformats": "^13.3.2",
+    "sade": "^1.8.1"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^3.0.9",
+    "standard": "^17.1.2",
     "typescript": "^5.8.2",
     "vitest": "^3.0.9"
   },
@@ -111,13 +109,20 @@
   },
   "homepage": "https://github.com/web3-storage/pail#readme",
   "standard": {
-    "ignore": [
-      "*.ts"
+    "globals": [
+      "describe",
+      "before",
+      "after",
+      "beforeEach",
+      "afterEach",
+      "it",
+      "assert"
     ]
   },
   "pnpm": {
     "onlyBuiltDependencies": [
-      "es5-ext"
+      "es5-ext",
+      "esbuild"
     ]
   }
 }

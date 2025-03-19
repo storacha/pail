@@ -26,5 +26,5 @@ export interface CRDTBatcher extends Batcher {
    * Encode all altered shards in the batch and return the new root CID, new
    * clock head, the new clock event and the difference blocks.
    */
-  commit (): Promise<Result>
+  commit: () => Promise<Result>
 }
