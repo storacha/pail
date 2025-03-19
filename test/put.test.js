@@ -1,4 +1,3 @@
-import { describe, it } from 'mocha'
 import assert from 'node:assert'
 import { nanoid } from 'nanoid'
 // eslint-disable-next-line no-unused-vars
@@ -180,7 +179,6 @@ describe('put', () => {
   })
 
   it('put 10,000x', async function () {
-    this.timeout(1000 * 10)
 
     const root = await ShardBlock.create()
     const blocks = new Blockstore()
@@ -196,5 +194,5 @@ describe('put', () => {
 
     const res = await putAll(blocks, root.cid, items)
     await assert.doesNotReject(verify(blocks, res.root, new Map(items)))
-  })
+  }, 10_000)
 })

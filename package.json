@@ -8,59 +8,59 @@
   "exports": {
     ".": {
       "types": "./dist/src/index.d.ts",
-      "import": "./src/index.js"
+      "import": "./dist/src/index.js"
     },
     "./api": {
       "types": "./dist/src/api.d.ts",
-      "import": "./src/api.js"
+      "import": "./dist/src/api.js"
     },
     "./batch": {
       "types": "./dist/src/batch/index.d.ts",
-      "import": "./src/batch/index.js"
+      "import": "./dist/src/batch/index.js"
     },
     "./batch/api": {
       "types": "./dist/src/batch/api.d.ts",
-      "import": "./src/batch/api.js"
+      "import": "./dist/src/batch/api.js"
     },
     "./block": {
       "types": "./dist/src/block.d.ts",
-      "import": "./src/block.js"
+      "import": "./dist/src/block.js"
     },
     "./clock": {
       "types": "./dist/src/clock/index.d.ts",
-      "import": "./src/clock/index.js"
+      "import": "./dist/src/clock/index.js"
     },
     "./clock/api": {
       "types": "./dist/src/clock/api.d.ts",
-      "import": "./src/clock/api.js"
+      "import": "./dist/src/clock/api.js"
     },
     "./crdt": {
       "types": "./dist/src/crdt/index.d.ts",
-      "import": "./src/crdt/index.js"
+      "import": "./dist/src/crdt/index.js"
     },
     "./crdt/api": {
       "types": "./dist/src/crdt/api.d.ts",
-      "import": "./src/crdt/api.js"
+      "import": "./dist/src/crdt/api.js"
     },
     "./crdt/batch": {
       "types": "./dist/src/crdt/batch/index.d.ts",
-      "import": "./src/crdt/batch/index.js"
+      "import": "./dist/src/crdt/batch/index.js"
     },
     "./crdt/batch/api": {
       "types": "./dist/src/crdt/batch/api.d.ts",
-      "import": "./src/crdt/batch/api.js"
+      "import": "./dist/src/crdt/batch/api.js"
     },
     "./diff": {
       "types": "./dist/src/diff.d.ts",
-      "import": "./src/diff.js"
+      "import": "./dist/src/diff.js"
     },
     "./merge": {
       "types": "./dist/src/merge.d.ts",
-      "import": "./src/merge.js"
+      "import": "./dist/src/merge.js"
     },
     "./shard": {
       "types": "./dist/src/shard.d.ts",
-      "import": "./src/shard.js"
+      "import": "./dist/src/shard.js"
     }
   },
   "bin": {
@@ -68,8 +68,8 @@
   },
   "scripts": {
     "build": "tsc --build",
-    "test": "mocha test/*.test.js",
-    "coverage": "c8 -r html -r text npm test",
+    "test": "vitest --run",
+    "coverage": "vitest --run --coverage",
     "lint": "standard"
   },
   "keywords": [
@@ -88,6 +88,7 @@
   ],
   "dependencies": {
     "@ipld/dag-cbor": "^9.2.2",
+    "@vitest/coverage-v8": "^3.0.9",
     "multiformats": "^13.3.2"
   },
   "devDependencies": {
@@ -95,11 +96,11 @@
     "c8": "^8.0.1",
     "carstream": "^2.0.0",
     "cli-color": "^2.0.3",
-    "mocha": "^10.2.0",
     "nanoid": "^4.0.0",
     "sade": "^1.8.1",
     "standard": "^17.0.0",
-    "typescript": "^5.8.2"
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.9"
   },
   "repository": {
     "type": "git",
