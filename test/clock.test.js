@@ -2,7 +2,7 @@ import { describe, it } from 'mocha'
 import assert from 'node:assert'
 // eslint-disable-next-line no-unused-vars
 import * as API from '../src/clock/api.js'
-import { advance, EventBlock, vis, encodeEventBlock, decodeEventBlock } from '../src/clock/index.js'
+import { advance, EventBlock, vis } from '../src/clock/index.js'
 import { Blockstore, randomCID } from './helpers.js'
 
 async function randomEventData () {
