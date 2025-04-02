@@ -2,7 +2,7 @@ import { describe, it } from 'mocha'
 import assert from 'node:assert'
 // eslint-disable-next-line no-unused-vars
 import * as API from '../src/clock/api.js'
-import { advance, EventBlock, vis } from '../src/clock/index.js'
+import { advance, EventBlock, vis, encodeEventBlock, decodeEventBlock } from '../src/clock/index.js'
 import { Blockstore, randomCID } from './helpers.js'
 
 async function randomEventData () {
@@ -294,5 +294,13 @@ describe('clock', () => {
     assert.equal(head[1].toString(), event4.cid.toString())
     assert.equal(head[0].toString(), event3.cid.toString())
     assert.equal(count - before, 8, 'The number of traversals should be 8 with optimization')
+  })
+
+  it('sorts event links', async () => {
+    const parent0 = await EventBlock.create(await randomEventData())
+    const parent1 = await EventBlock.create(await randomEventData())
+    const child0 = await EventBlock.create({}, [parent0.cid, parent1.cid])
+    const child1 = await EventBlock.create({}, [parent1.cid, parent0.cid])
+    assert.deepEqual(child0.bytes, child1.bytes)
   })
 })
