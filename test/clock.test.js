@@ -1,4 +1,3 @@
-import assert from 'node:assert'
 // eslint-disable-next-line no-unused-vars
 import * as API from '../src/clock/api.js'
 import { advance, EventBlock, vis } from '../src/clock/index.js'

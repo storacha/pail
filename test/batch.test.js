@@ -1,4 +1,4 @@
-import assert from 'node:assert'
+import { expect } from 'vitest'
 // eslint-disable-next-line no-unused-vars
 import * as API from '../src/api.js'
 import { ShardBlock } from '../src/shard.js'
@@ -84,7 +84,7 @@ describe('batch', () => {
       await batch.put(op.key, op.value)
     }
     await batch.commit()
-    await assert.rejects(batch.put('test', await randomCID()), /batch already committed/)
+    await expect(async () => batch.put('test', await randomCID())).rejects.toThrowError(/batch already committed/)
   })
 
   it('error when commit after commit', async () => {
@@ -102,7 +102,7 @@ describe('batch', () => {
       await batch.put(op.key, op.value)
     }
     await batch.commit()
-    await assert.rejects(batch.commit(), /batch already committed/)
+    await expect(async () => batch.commit()).rejects.toThrowError(/batch already committed/)
   })
 
   it('traverses existing shards to put values', async () => {

@@ -17,9 +17,6 @@ importers:
       carstream:
         specifier: ^2.0.0
         version: 2.0.0
-      cli-color:
-        specifier: ^2.0.3
-        version: 2.0.3
       multiformats:
         specifier: ^13.3.2
         version: 13.3.2
@@ -27,9 +24,21 @@ importers:
         specifier: ^1.8.1
         version: 1.8.1
     devDependencies:
+      '@ipld/car':
+        specifier: ^5.4.0
+        version: 5.4.0
+      '@types/archy':
+        specifier: ^0.0.36
+        version: 0.0.36
+      '@types/cli-color':
+        specifier: ^2.0.6
+        version: 2.0.6
       '@vitest/coverage-v8':
         specifier: ^3.0.9
         version: 3.0.9(vitest@3.0.9)
+      cli-color:
+        specifier: ^2.0.3
+        version: 2.0.3
       standard:
         specifier: ^17.1.2
         version: 17.1.2
@@ -252,6 +261,10 @@ packages:
     resolution: {integrity: sha512-dvuCeX5fC9dXgJn9t+X5atfmgQAzUOWqS1254Gh0m6i8wKd10ebXkfNKiRK+1GWi/yTvvLDHpoxLr0xxxeslWw==}
     deprecated: Use @eslint/object-schema instead
 
+  '@ipld/car@5.4.0':
+    resolution: {integrity: sha512-FiGxOhTUh3fn/kkA+YvNYQjA/T8T5DcKG0NZwAi3aXrizN1qm99HzdYTccEwcX/rUCtI8wTUCKDNPBLUb7pBIQ==}
+    engines: {node: '>=16.0.0', npm: '>=7.0.0'}
+
   '@ipld/dag-cbor@9.2.2':
     resolution: {integrity: sha512-uIEOuruCqKTP50OBWwgz4Js2+LhiBQaxc57cnP71f45b1mHEAo1OCR1Zn/TbvSW/mV1x+JqhacIktkKyaYqhCw==}
     engines: {node: '>=16.0.0', npm: '>=7.0.0'}
@@ -392,6 +405,12 @@ packages:
     resolution: {integrity: sha512-aRXd7tRZkWLqGbChgcMMDEHjOKudo1kChb1Jt1IfR8cY/KIpgNviLeJy5FUb9IpSuQj8dU2fAYNMPW/hLKOSTw==}
     cpu: [x64]
     os: [win32]
+
+  '@types/archy@0.0.36':
+    resolution: {integrity: sha512-toTRTGD8trLtJsOaYbReoU/fyvRF1a4C5WtqjDZ3NnT/zvO807opSBRBJBr5VhD66JnY3BUz2UvnY5/KMAt6mw==}
+
+  '@types/cli-color@2.0.6':
+    resolution: {integrity: sha512-uLK0/0dOYdkX8hNsezpYh1gc8eerbhf9bOKZ3e24sP67703mw9S14/yW6mSTatiaKO9v+mU/a1EVy4rOXXeZTA==}
 
   '@types/estree@1.0.6':
     resolution: {integrity: sha512-AYnb1nQyY49te+VRAVgmzfcgjYS91mY5P0TKUDCLEM+gNnA+3T6rWITXRLYCpahpqSQbN5cE+gHpnPyXjHWxcw==}
@@ -1849,6 +1868,9 @@ packages:
   uri-js@4.4.1:
     resolution: {integrity: sha512-7rKUyy33Q1yc98pQ1DAmLtwX109F7TIfWlW1Ydo8Wl1ii1SeHieeh0HHfPeL2fMXK6z0s8ecKs9frCuLJvndBg==}
 
+  varint@6.0.0:
+    resolution: {integrity: sha512-cXEIW6cfr15lFv563k4GuVuW/fiwjknytD37jIOLSdSWuOI6WnO/oKwmP2FQTU2l01LP8/M5TSAJpzUaGe3uWg==}
+
   version-guard@1.1.1:
     resolution: {integrity: sha512-MGQLX89UxmYHgDvcXyjBI0cbmoW+t/dANDppNPrno64rYr8nH4SHSuElQuSYdXGEs0mUzdQe1BY+FhVPNsAmJQ==}
     engines: {node: '>=0.10.48'}
@@ -2115,6 +2137,13 @@ snapshots:
 
   '@humanwhocodes/object-schema@2.0.1': {}
 
+  '@ipld/car@5.4.0':
+    dependencies:
+      '@ipld/dag-cbor': 9.2.2
+      cborg: 4.0.7
+      multiformats: 13.3.2
+      varint: 6.0.0
+
   '@ipld/dag-cbor@9.2.2':
     dependencies:
       cborg: 4.0.7
@@ -2219,6 +2248,10 @@ snapshots:
 
   '@rollup/rollup-win32-x64-msvc@4.36.0':
     optional: true
+
+  '@types/archy@0.0.36': {}
+
+  '@types/cli-color@2.0.6': {}
 
   '@types/estree@1.0.6': {}
 
@@ -4123,6 +4156,8 @@ snapshots:
   uri-js@4.4.1:
     dependencies:
       punycode: 2.3.1
+
+  varint@6.0.0: {}
 
   version-guard@1.1.1: {}
 

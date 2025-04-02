@@ -1,4 +1,4 @@
-import assert from 'node:assert'
+import { expect } from 'vitest'
 // eslint-disable-next-line no-unused-vars
 import * as API from '../src/api.js'
 import { put } from '../src/index.js'
@@ -191,6 +191,7 @@ describe('put', () => {
     }
 
     const res = await putAll(blocks, root.cid, items)
-    await assert.doesNotReject(verify(blocks, res.root, new Map(items)))
+    expect(() => verify(blocks, res.root, new Map(items))).not.toThrow()
+    // await assert.doesNotReject(verify(blocks, res.root, new Map(items)))
   }, 10_000)
 })

@@ -1,5 +1,3 @@
-import crypto from 'node:crypto'
-import assert from 'node:assert'
 import * as Link from 'multiformats/link'
 import * as raw from 'multiformats/codecs/raw'
 import { sha256 } from 'multiformats/hashes/sha2'

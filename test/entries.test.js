@@ -1,4 +1,3 @@
-import assert from 'node:assert'
 // eslint-disable-next-line no-unused-vars
 import * as API from '../src/api.js'
 import { put, entries } from '../src/index.js'
