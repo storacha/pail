@@ -173,6 +173,7 @@ async function openPail (path) {
     if (!isShardLink(header.roots[0])) throw new Error(`not a shard: ${header.roots[0]}`)
     return { root: header.roots[0], blocks }
   } catch (err) {
+    // @ts-ignore
     if (err.code !== 'ENOENT') throw new Error('failed to open bucket', { cause: err })
     const rootblk = await ShardBlock.create()
     blocks.put(rootblk.cid, rootblk.bytes)
@@ -207,12 +208,14 @@ async function updatePail (path, blocks, root, { additions, removals }) {
   try {
     await fs.promises.rename(path, old)
   } catch (err) {
+    // @ts-ignore
     if (err.code !== 'ENOENT') throw err
   }
   await fs.promises.rename(tmp, path)
   try {
     await fs.promises.rm(old)
   } catch (err) {
+    // @ts-ignore
     if (err.code !== 'ENOENT') throw err
   }
 }

@@ -2,7 +2,7 @@
   "name": "@web3-storage/pail",
   "version": "0.6.0",
   "description": "DAG based key value store.",
-  "main": "src/index.js",
+  "main": "./dist/src/index.js",
   "type": "module",
   "types": "./dist/src/index.d.ts",
   "exports": {
@@ -64,7 +64,10 @@
     }
   },
   "bin": {
-    "pail": "./cli.js"
+    "pail": "./dist/cli.js",
+    "pail-propernames": "./scripts/propernames/gen.sh",
+    "pail-gen": "./dist/scripts/words/gen.js",
+    "pail-randomcid": "./dist/scripts/randomcid.js"
   },
   "scripts": {
     "build": "tsc --build",
@@ -83,22 +86,24 @@
   "author": "Alan Shaw",
   "license": "Apache-2.0 OR MIT",
   "files": [
-    "src",
     "dist"
   ],
   "dependencies": {
     "@ipld/dag-cbor": "^9.2.2",
+    "cli-color": "^2.0.3",
+    "@ipld/car": "^5.4.0",
     "archy": "^1.0.0",
     "carstream": "^2.0.0",
     "multiformats": "^13.3.2",
+    "randombytes": "^2.1.0",
     "sade": "^1.8.1"
   },
   "devDependencies": {
-    "@ipld/car": "^5.4.0",
     "@types/archy": "^0.0.36",
     "@types/cli-color": "^2.0.6",
+    "@types/node": "^22.13.17",
+    "@types/randombytes": "^2.0.3",
     "@vitest/coverage-v8": "^3.1.1",
-    "cli-color": "^2.0.3",
     "standard": "^17.1.2",
     "typescript": "^5.8.2",
     "vitest": "^3.1.1"
