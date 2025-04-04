@@ -1,6 +1,6 @@
 {
   "name": "@web3-storage/pail",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "DAG based key value store.",
   "main": "./dist/src/index.js",
   "type": "module",
