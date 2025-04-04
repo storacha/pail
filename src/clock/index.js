@@ -94,10 +94,28 @@ export class EventFetcher {
  * @returns {Promise<API.EventBlockView<T>>}
  */
 export const encodeEventBlock = async (value) => {
-  // TODO: sort parents
-  const { cid, bytes } = await encode({ value, codec: cbor, hasher: sha256 })
+  if (typeof value.data === 'undefined' || !Array.isArray(value.parents)) {
+    throw new Error('invalid event block structure')
+  }
+  const { data } = value
+  const parents = [...value.parents].sort((a, b) => compareBytes(a.bytes, b.bytes))
+  const { cid, bytes } = await encode({ value: { data, parents }, codec: cbor, hasher: sha256 })
   // @ts-expect-error
   return new Block({ cid, value, bytes })
+}
+
+/**
+ * @param {Uint8Array} a
+ * @param {Uint8Array} b
+ */
+const compareBytes = (a, b) => {
+  for (let i = 0; i < a.byteLength; i++) {
+    if (a[i] < b[i]) return -1
+    if (a[i] > b[i]) return 1
+  }
+  if (a.byteLength > b.byteLength) return 1
+  if (a.byteLength < b.byteLength) return -1
+  return 0
 }
 
 /**
