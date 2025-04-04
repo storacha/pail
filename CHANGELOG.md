@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.2](https://github.com/storacha/pail/compare/v0.6.1...v0.6.2) (2025-04-04)
+
+
+### Bug Fixes
+
+* vis output ([eadebad](https://github.com/storacha/pail/commit/eadebad99afd7b44231f2e0ed25ee182db123489))
+
 ## [0.6.1](https://github.com/storacha/pail/compare/v0.6.0...v0.6.1) (2025-04-04)
 
 
