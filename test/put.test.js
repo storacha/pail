@@ -1,6 +1,4 @@
-import { describe, it } from 'mocha'
-import assert from 'node:assert'
-import { nanoid } from 'nanoid'
+import { expect } from 'vitest'
 // eslint-disable-next-line no-unused-vars
 import * as API from '../src/api.js'
 import { put } from '../src/index.js'
@@ -136,7 +134,7 @@ describe('put', () => {
       [0, 1, 2, 3, 4],
       [4, 3, 2, 1, 0],
       [1, 2, 4, 0, 3],
-      [2, 0, 3, 4, 1],
+      [2, 0, 3, 4, 1]
     ]
     for (const order of orders) {
       const root = await ShardBlock.create()
@@ -180,8 +178,6 @@ describe('put', () => {
   })
 
   it('put 10,000x', async function () {
-    this.timeout(1000 * 10)
-
     const root = await ShardBlock.create()
     const blocks = new Blockstore()
     await blocks.put(root.cid, root.bytes)
@@ -195,6 +191,7 @@ describe('put', () => {
     }
 
     const res = await putAll(blocks, root.cid, items)
-    await assert.doesNotReject(verify(blocks, res.root, new Map(items)))
-  })
+    expect(() => verify(blocks, res.root, new Map(items))).not.toThrow()
+    // await assert.doesNotReject(verify(blocks, res.root, new Map(items)))
+  }, 10_000)
 })

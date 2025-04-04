@@ -1,5 +1,3 @@
-import { describe, it } from 'mocha'
-import assert from 'node:assert'
 // eslint-disable-next-line no-unused-vars
 import * as API from '../src/clock/api.js'
 import { advance, EventBlock, vis } from '../src/clock/index.js'
@@ -221,7 +219,6 @@ describe('clock', () => {
     assert.equal(head[0].toString(), event1.cid.toString())
   })
 
-
   /*
   ```mermaid
   flowchart TB
@@ -254,7 +251,7 @@ describe('clock', () => {
       * (we don't fetch genesis due to existing cycle detection)
 
   Without deduping, we expect 9 node fetches, since we traverse across `event0`
-  again, since it is linked to by 2 nodes. 
+  again, since it is linked to by 2 nodes.
    */
   it('contains only traverses history once', async () => {
     const blocks = new Blockstore()

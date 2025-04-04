@@ -5,7 +5,7 @@ export { BlockFetcher } from '../api.js'
 export type EventLink<T> = Link<EventView<T>>
 
 export interface EventView<T> {
-  parents: EventLink<T>[]
+  parents: Array<EventLink<T>>
   data: T
 }
 

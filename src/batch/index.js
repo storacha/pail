@@ -84,7 +84,7 @@ export const put = async (blocks, shard, key, value) => {
 
   /** @type {API.BatcherShardEntry} */
   let entry = [dest.key, value]
-  let targetEntries = [...dest.shard.entries]
+  const targetEntries = [...dest.shard.entries]
 
   for (const [i, e] of targetEntries.entries()) {
     const [k, v] = e
@@ -120,7 +120,7 @@ export const put = async (blocks, shard, key, value) => {
         prefix: dest.shard.prefix + common,
         entries
       })
-  
+
       // need to spread as access by index does not consider utf-16 surrogates
       const commonChars = [...common]
 

@@ -23,7 +23,7 @@ async function main () {
   blocks.putSync(rootblk.cid, rootblk.bytes)
 
   console.time(`put x${words.length}`)
-  /** @type {import('../../src/api.js').ShardLink} */
+  /** @type {import('../../src/api.ts').ShardLink} */
   let root = rootblk.cid
   for (const [i, word] of words.entries()) {
     const res = await put(blocks, root, word, cids[i])
@@ -43,7 +43,7 @@ async function main () {
   // @ts-expect-error
   const { writer, out } = CarWriter.create(root)
   const finishPromise = new Promise(resolve => {
-    Readable.from(out).pipe(fs.createWriteStream('./pail.car')).on('finish', resolve)
+    Readable.from(out).pipe(fs.createWriteStream('./pail.car')).on('finish', () => resolve(true))
   })
 
   for (const b of blocks.entries()) {

@@ -50,10 +50,10 @@ export interface Batcher {
    * Put a value (a CID) for the given key. If the key exists it's value is
    * overwritten.
    */
-  put (key: string, value: UnknownLink): Promise<void>
+  put: (key: string, value: UnknownLink) => Promise<void>
   /**
    * Encode all altered shards in the batch and return the new root CID and
    * difference blocks.
    */
-  commit (): Promise<{ root: ShardLink } & ShardDiff>
+  commit: () => Promise<{ root: ShardLink } & ShardDiff>
 }

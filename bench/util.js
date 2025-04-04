@@ -3,7 +3,9 @@ import { Readable } from 'stream'
 import { CarWriter } from '@ipld/car'
 // eslint-disable-next-line no-unused-vars
 import * as API from '../src/api.js'
+// eslint-disable-next-line no-unused-vars
 import { get, entries } from '../src/index.js'
+// eslint-disable-next-line no-unused-vars
 import { MemoryBlockstore } from '../src/block.js'
 import { ShardFetcher } from '../src/shard.js'
 
@@ -50,7 +52,7 @@ export const collectMetrics = async (blocks, root) => {
     if (!Array.isArray(v)) {
       totalEntries++
       maxDepth = depth > maxDepth ? depth : maxDepth
-      totalDepth += depth 
+      totalDepth += depth
       return
     }
     if (v[1]) totalEntries++

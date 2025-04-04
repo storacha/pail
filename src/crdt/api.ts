@@ -6,7 +6,7 @@ export { EventBlockView, EventLink } from '../clock/api.js'
 
 export interface Result extends ShardDiff {
   root: ShardLink
-  head: EventLink<Operation>[]
+  head: Array<EventLink<Operation>>
   event?: EventBlockView<Operation>
 }
 
@@ -17,17 +17,17 @@ export type Operation = (
 ) & { root: ShardLink }
 
 export interface PutOperation {
-  type: 'put',
+  type: 'put'
   key: string
   value: UnknownLink
 }
 
 export interface DeleteOperation {
-  type: 'del',
+  type: 'del'
   key: string
 }
 
 export interface BatchOperation {
-  type: 'batch',
-  ops: Array<PutOperation|DeleteOperation>
+  type: 'batch'
+  ops: Array<PutOperation | DeleteOperation>
 }

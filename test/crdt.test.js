@@ -1,5 +1,4 @@
-import { describe, it } from 'mocha'
-import assert from 'node:assert'
+import { expect } from 'vitest'
 // eslint-disable-next-line no-unused-vars
 import * as API from '../src/crdt/api.js'
 import { advance, vis } from '../src/clock/index.js'
@@ -17,9 +16,9 @@ describe('CRDT', () => {
     await alice.vis()
 
     assert(event)
-    assert(event.value.data.type === 'put')
-    assert.equal(event.value.data.key, key)
-    assert.equal(event.value.data.value.toString(), value.toString())
+    assert(event?.value.data.type === 'put')
+    assert.equal(event?.value.data.key, key)
+    assert.equal(event?.value.data.value.toString(), value.toString())
     assert.equal(head.length, 1)
     assert.equal(head[0].toString(), event.cid.toString())
   })
@@ -195,7 +194,7 @@ describe('CRDT batch', () => {
       await batch.put(op.key, op.value)
     }
     await batch.commit()
-    await assert.rejects(batch.put('test', await randomCID()), /batch already committed/)
+    await expect(async () => batch.put('test', await randomCID())).rejects.toThrow(/batch already committed/)
   })
 
   it('error when commit after commit', async () => {
@@ -211,7 +210,7 @@ describe('CRDT batch', () => {
       await batch.put(op.key, op.value)
     }
     await batch.commit()
-    await assert.rejects(batch.commit(), /batch already committed/)
+    await expect(async () => batch.commit()).rejects.toThrow(/batch already committed/)
   })
 
   it('linear put with batch', async () => {
@@ -305,7 +304,10 @@ class TestPail {
   async vis () {
     /** @param {API.UnknownLink} l */
     const shortLink = l => `${String(l).slice(0, 4)}..${String(l).slice(-4)}`
-    /** @param {API.PutOperation|API.DeleteOperation|API.BatchOperation} o */
+    /**
+     * @param {API.PutOperation|API.DeleteOperation|API.BatchOperation} o
+     * @returns {string}
+     **/
     const renderOp = o => o.type === 'batch'
       ? `${o.ops.slice(0, 10).map(renderOp).join('\\n')}${o.ops.length > 10 ? `\\n...${o.ops.length - 10} more` : ''}`
       : `${o.type}(${o.key}${o.type === 'put'

@@ -1,4 +1,6 @@
-import { Link, UnknownLink, BlockView, Block, Version } from 'multiformats'
+import type { Version } from 'multiformats'
+import type { Link, UnknownLink } from 'multiformats/link/interface'
+import type { Block, BlockView } from 'multiformats/block/interface'
 import { sha256 } from 'multiformats/hashes/sha2'
 import * as dagCBOR from '@ipld/dag-cbor'
 
@@ -31,8 +33,7 @@ export interface ShardDiff {
 }
 
 export interface BlockFetcher {
-  get<T = unknown, C extends number = number, A extends number = number, V extends Version = 1> (link: Link<T, C, A, V>):
-    Promise<Block<T, C, A, V> | undefined>
+  get: <T = unknown, C extends number = number, A extends number = number, V extends Version = 1>(link: Link<T, C, A, V>) => Promise<Block<T, C, A, V> | undefined>
 }
 
 export interface ShardConfig {
