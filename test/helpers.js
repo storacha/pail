@@ -38,18 +38,6 @@ export async function randomCID (size = 32) {
   return Link.create(raw.code, hash)
 }
 
-/** @param {number} size */
-export async function randomBytes (size) {
-  const bytes = new Uint8Array(size)
-  while (size) {
-    const chunk = new Uint8Array(Math.min(size, 65_536))
-    crypto.getRandomValues(chunk)
-    size -= bytes.length
-    bytes.set(chunk, size)
-  }
-  return bytes
-}
-
 export class Blockstore extends MemoryBlockstore {
   /**
    * @param {import('../src/api.js').ShardLink} cid
@@ -151,4 +139,20 @@ export const verify = async (blocks, root, data) => {
   // eslint-disable-next-line no-unused-vars
   for await (const _ of entries(blocks, root)) total++
   if (data.size !== total) throw new Error(`incorrect entry count: ${total} !== ${data.size}`)
+}
+
+/**
+ * @param {number} size
+ */
+export async function randomBytes (size) {
+  /** @type {{getRandomValues: (u: Uint8Array) => Uint8Array}} */
+  let myCrypto
+  if ('crypto' in globalThis && 'getRandomValues' in globalThis.crypto) {
+    myCrypto = globalThis.crypto
+  } else {
+    myCrypto = await import('node:crypto')
+  }
+  const bytes = new Uint8Array(size)
+  myCrypto.getRandomValues(bytes)
+  return bytes
 }

@@ -22,8 +22,10 @@ jobs:
     strategy:
       matrix:
         node-version:
+          # for the sake of it
           - 18
           - 20
+          - 22
         os:
           - ubuntu-latest
     runs-on: ${{ matrix.os }}

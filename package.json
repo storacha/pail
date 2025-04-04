@@ -95,14 +95,12 @@
     "archy": "^1.0.0",
     "carstream": "^2.0.0",
     "multiformats": "^13.3.2",
-    "randombytes": "^2.1.0",
     "sade": "^1.8.1"
   },
   "devDependencies": {
     "@types/archy": "^0.0.36",
     "@types/cli-color": "^2.0.6",
     "@types/node": "^22.13.17",
-    "@types/randombytes": "^2.0.3",
     "@vitest/coverage-v8": "^3.1.1",
     "standard": "^17.1.2",
     "typescript": "^5.8.2",
