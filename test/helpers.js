@@ -5,9 +5,12 @@ import clc from 'cli-color'
 import archy from 'archy'
 // eslint-disable-next-line no-unused-vars
 import * as API from '../src/api.js'
+// eslint-disable-next-line no-unused-vars
+import * as ClockAPI from '../src/clock/api.js'
 import { ShardFetcher, decodeBlock } from '../src/shard.js'
 import { MemoryBlockstore } from '../src/block.js'
 import { entries, get, put } from '../src/index.js'
+import * as Clock from '../src/clock/index.js'
 
 /**
  * @param {number} min
@@ -155,4 +158,19 @@ export async function randomBytes (size) {
   const bytes = new Uint8Array(size)
   myCrypto.getRandomValues(bytes)
   return bytes
+}
+
+/**
+ * @template T
+ * @param {API.BlockFetcher} blocks Block storage.
+ * @param {ClockAPI.EventLink<T>[]} head
+ * @param {object} [options]
+ * @param {(b: ClockAPI.EventBlockView<T>) => string} [options.renderNodeLabel]
+ */
+export const clockVis = async (blocks, head, options) => {
+  const lines = []
+  for await (const line of Clock.vis(blocks, head, options)) {
+    lines.push(line)
+  }
+  console.log(lines.join('\n'))
 }

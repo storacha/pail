@@ -4,7 +4,7 @@ import * as API from '../src/crdt/api.js'
 import { advance, vis } from '../src/clock/index.js'
 import { put, get, root, entries } from '../src/crdt/index.js'
 import * as Batch from '../src/crdt/batch/index.js'
-import { Blockstore, randomCID, randomString } from './helpers.js'
+import { Blockstore, clockVis, randomCID, randomString } from './helpers.js'
 
 describe('CRDT', () => {
   it('put a value to a new clock', async () => {
@@ -315,9 +315,7 @@ class TestPail {
         : ''})`
     /** @type {(e: API.EventBlockView<API.Operation>) => string} */
     const renderNodeLabel = event => `${shortLink(event.cid)}\\n${renderOp(event.value.data)}`
-    for await (const line of vis(this.blocks, this.head, { renderNodeLabel })) {
-      console.log(line)
-    }
+    await clockVis(this.blocks, this.head, { renderNodeLabel })
   }
 
   /** @param {string} key */

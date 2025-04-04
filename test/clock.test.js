@@ -1,7 +1,7 @@
 // eslint-disable-next-line no-unused-vars
 import * as API from '../src/clock/api.js'
 import { advance, EventBlock, vis } from '../src/clock/index.js'
-import { Blockstore, randomCID } from './helpers.js'
+import { Blockstore, randomCID, clockVis } from './helpers.js'
 
 async function randomEventData () {
   return {
@@ -19,7 +19,7 @@ describe('clock', () => {
     await blocks.put(event.cid, event.bytes)
     const head = await advance(blocks, [], event.cid)
 
-    for await (const line of vis(blocks, head)) console.log(line)
+    await clockVis(blocks, head)
     assert.equal(head.length, 1)
     assert.equal(head[0].toString(), event.cid.toString())
   })
@@ -37,7 +37,7 @@ describe('clock', () => {
 
     head = await advance(blocks, head, event.cid)
 
-    for await (const line of vis(blocks, head)) console.log(line)
+    await clockVis(blocks, head)
     assert.equal(head.length, 1)
     assert.equal(head[0].toString(), event.cid.toString())
   })
@@ -59,7 +59,7 @@ describe('clock', () => {
     await blocks.put(event1.cid, event1.bytes)
     head = await advance(blocks, head, event1.cid)
 
-    for await (const line of vis(blocks, head)) console.log(line)
+    await clockVis(blocks, head)
     assert.equal(head.length, 2)
     assert.equal(head[0].toString(), event0.cid.toString())
     assert.equal(head[1].toString(), event1.cid.toString())
@@ -94,7 +94,7 @@ describe('clock', () => {
     await blocks.put(event4.cid, event4.bytes)
     head = await advance(blocks, head, event4.cid)
 
-    for await (const line of vis(blocks, head)) console.log(line)
+    await clockVis(blocks, head)
     assert.equal(head.length, 2)
     assert.equal(head[0].toString(), event3.cid.toString())
     assert.equal(head[1].toString(), event4.cid.toString())
@@ -137,7 +137,7 @@ describe('clock', () => {
     await blocks.put(event5.cid, event5.bytes)
     head = await advance(blocks, head, event5.cid)
 
-    for await (const line of vis(blocks, head)) console.log(line)
+    await clockVis(blocks, head)
     assert.equal(head.length, 1)
     assert.equal(head[0].toString(), event5.cid.toString())
   })
@@ -192,7 +192,7 @@ describe('clock', () => {
     head = await advance(blocks, head, event6.cid)
     assert.equal(count - before, 10)
 
-    for await (const line of vis(blocks, head)) console.log(line)
+    await clockVis(blocks, head)
     assert.equal(head.length, 2)
     assert.equal(head[0].toString(), event5.cid.toString())
     assert.equal(head[1].toString(), event6.cid.toString())
@@ -214,7 +214,7 @@ describe('clock', () => {
 
     head = await advance(blocks, head, event1.cid)
 
-    for await (const line of vis(blocks, head)) console.log(line)
+    await clockVis(blocks, head)
     assert.equal(head.length, 1)
     assert.equal(head[0].toString(), event1.cid.toString())
   })
