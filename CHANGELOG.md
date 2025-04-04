@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.6.1](https://github.com/storacha/pail/compare/v0.6.0...v0.6.1) (2025-04-04)
+
+
+### Bug Fixes
+
+* api.js in typescript version ([#40](https://github.com/storacha/pail/issues/40)) ([5620002](https://github.com/storacha/pail/commit/56200023b606c5ac37dc4f2d1835ac19e541eeed))
+* release please permissions ([61caec8](https://github.com/storacha/pail/commit/61caec862221586989eedf03d5b89f6143c97c65))
+* sort event parents ([#41](https://github.com/storacha/pail/issues/41)) ([128c194](https://github.com/storacha/pail/commit/128c1943e16d6b473bf676fa02035b08be692b5d))
+
 ## [0.6.0](https://github.com/web3-storage/pail/compare/v0.5.0...v0.6.0) (2024-04-22)
 
 
