@@ -3,3 +3,4 @@ coverage
 *.car
 dist
 .clinic
+package-lock.json
