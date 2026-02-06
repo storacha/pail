@@ -97,4 +97,3 @@ export type EntriesOptions =
   | KeyOrderOption
   | (KeyPrefixOption & KeyOrderOption)
   | (KeyRangeOption & KeyOrderOption)
-  | (KeyPrefixOption & KeyRangeOption & KeyOrderOption)
