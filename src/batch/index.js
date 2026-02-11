@@ -38,6 +38,15 @@ class Batcher {
     return put(this.blocks, this, key, value)
   }
 
+  /**
+   * @param {string} key The key of the value to delete.
+   * @returns {Promise<void>}
+   */
+  async del (key) {
+    if (this.#committed) throw new BatchCommittedError()
+    return del(this.blocks, this, key)
+  }
+
   async commit () {
     if (this.#committed) throw new BatchCommittedError()
     this.#committed = true
@@ -163,6 +172,31 @@ export const put = async (blocks, shard, key, value) => {
   }
 
   shard.entries = Shard.putEntry(asShardEntries(targetEntries), asShardEntry(entry))
+}
+
+/**
+ * @param {API.BlockFetcher} blocks
+ * @param {API.BatcherShard} shard
+ * @param {string} key The key of the value to delete.
+ * @returns {Promise<void>}
+ */
+export const del = async (blocks, shard, key) => {
+  const shards = new ShardFetcher(blocks)
+  const dest = await traverse(shards, shard, key)
+
+  const entryidx = dest.shard.entries.findIndex(([k]) => k === dest.key)
+  if (entryidx === -1) return
+
+  const entry = dest.shard.entries[entryidx]
+  if (Array.isArray(entry[1])) {
+    // cannot delete a shard-only entry (no value)
+    if (entry[1][1] == null) return
+    // remove value but keep shard link
+    dest.shard.entries[entryidx] = [entry[0], [entry[1][0]]]
+  } else {
+    // remove the entry entirely
+    dest.shard.entries.splice(entryidx, 1)
+  }
 }
 
 /**

@@ -2,7 +2,7 @@ import { expect } from 'vitest'
 // eslint-disable-next-line no-unused-vars
 import * as API from '../src/crdt/api.js'
 import { advance, vis } from '../src/clock/index.js'
-import { put, get, root, entries } from '../src/crdt/index.js'
+import { put, del, get, root, entries } from '../src/crdt/index.js'
 import * as Batch from '../src/crdt/batch/index.js'
 import { Blockstore, clockVis, randomCID, randomString } from './helpers.js'
 
@@ -251,6 +251,287 @@ describe('CRDT batch', () => {
   })
 })
 
+describe('CRDT batch del', () => {
+  it('batch with del operations', async () => {
+    const blocks = new Blockstore()
+    const alice = new TestPail(blocks, [])
+
+    await alice.put('apple', await randomCID(32))
+    await alice.put('banana', await randomCID(32))
+    await alice.put('cherry', await randomCID(32))
+
+    await alice.applyBatch([
+      { type: 'del', key: 'apple' },
+      { type: 'del', key: 'banana' }
+    ])
+
+    assert.equal(await alice.get('apple'), undefined)
+    assert.equal(await alice.get('banana'), undefined)
+    assert(await alice.get('cherry'))
+  })
+
+  it('batch with mixed put and del', async () => {
+    const blocks = new Blockstore()
+    const alice = new TestPail(blocks, [])
+
+    await alice.put('apple', await randomCID(32))
+    await alice.put('banana', await randomCID(32))
+
+    const mangoValue = await randomCID(32)
+    await alice.applyBatch([
+      { type: 'del', key: 'apple' },
+      { type: 'put', key: 'mango', value: mangoValue }
+    ])
+
+    assert.equal(await alice.get('apple'), undefined)
+    assert(await alice.get('banana'))
+    const mango = await alice.get('mango')
+    assert(mango)
+    assert.equal(mango.toString(), mangoValue.toString())
+  })
+
+  it('batch with internal put then delete of same key simplifies correctly on merge', async () => {
+    const blocks = new Blockstore()
+    const alice = new TestPail(blocks, [])
+
+    await alice.put('apple', await randomCID(32))
+    await alice.put('banana', await randomCID(32))
+
+    const bob = new TestPail(blocks, alice.head)
+
+    // alice does an unrelated put
+    const { event: aEvent } = await alice.put('cherry', await randomCID(32))
+
+    // bob does a batch: put apple (new value), put date, then delete apple
+    // net effect of the batch should be: put date, delete apple
+    const { event: bEvent } = await bob.applyBatch([
+      { type: 'put', key: 'apple', value: await randomCID(32) },
+      { type: 'put', key: 'date', value: await randomCID(32) },
+      { type: 'del', key: 'apple' }
+    ])
+
+    assert(aEvent)
+    assert(bEvent)
+
+    // merge
+    await alice.advance(bEvent.cid)
+    await bob.advance(aEvent.cid)
+
+    // apple should be deleted — the batch's internal delete comes after its put
+    assert.equal(await alice.get('apple'), undefined)
+    assert.equal(await bob.get('apple'), undefined)
+
+    // date from batch should exist
+    assert(await alice.get('date'))
+    assert(await bob.get('date'))
+
+    // cherry and banana should still exist
+    assert(await alice.get('cherry'))
+    assert(await alice.get('banana'))
+
+    // roots should converge
+    assert(alice.root)
+    assert(bob.root)
+    assert.equal(alice.root.toString(), bob.root.toString())
+  })
+
+  it('batch internal delete overridden by concurrent external put', async () => {
+    const blocks = new Blockstore()
+    const alice = new TestPail(blocks, [])
+
+    await alice.put('apple', await randomCID(32))
+
+    const bob = new TestPail(blocks, alice.head)
+
+    // alice puts a new value for apple
+    const value1 = await randomCID(32)
+    const { event: aEvent } = await alice.put('apple', value1)
+
+    // bob does a batch: put apple, put banana, delete apple
+    // net effect of batch: put banana, delete apple
+    // but alice's concurrent put should win over the batch's net delete
+    const { event: bEvent } = await bob.applyBatch([
+      { type: 'put', key: 'apple', value: await randomCID(32) },
+      { type: 'put', key: 'banana', value: await randomCID(32) },
+      { type: 'del', key: 'apple' }
+    ])
+
+    assert(aEvent)
+    assert(bEvent)
+
+    // merge
+    await alice.advance(bEvent.cid)
+    await bob.advance(aEvent.cid)
+
+    // put wins: alice's concurrent put for apple should win over batch's net delete
+    const aValue = await alice.get('apple')
+    assert(aValue)
+    assert.equal(aValue.toString(), value1.toString())
+
+    // banana from batch should exist
+    assert(await alice.get('banana'))
+
+    // roots should converge
+    assert(alice.root)
+    assert(bob.root)
+    assert.equal(alice.root.toString(), bob.root.toString())
+  })
+
+  it('concurrent batch del and put converge', async () => {
+    const blocks = new Blockstore()
+    const alice = new TestPail(blocks, [])
+
+    await alice.put('apple', await randomCID(32))
+    await alice.put('banana', await randomCID(32))
+
+    const bob = new TestPail(blocks, alice.head)
+
+    // alice puts new value for apple
+    const value1 = await randomCID(32)
+    const { event: aEvent } = await alice.put('apple', value1)
+
+    // bob batch-deletes apple and puts cherry
+    const cherryValue = await randomCID(32)
+    const { event: bEvent } = await bob.applyBatch([
+      { type: 'del', key: 'apple' },
+      { type: 'put', key: 'cherry', value: cherryValue }
+    ])
+
+    assert(aEvent)
+    assert(bEvent)
+
+    await alice.advance(bEvent.cid)
+    await bob.advance(aEvent.cid)
+
+    // put wins: apple should have alice's value
+    const aValue = await alice.get('apple')
+    assert(aValue)
+    assert.equal(aValue.toString(), value1.toString())
+
+    // cherry from batch should exist
+    const aCherry = await alice.get('cherry')
+    assert(aCherry)
+    assert.equal(aCherry.toString(), cherryValue.toString())
+
+    // roots should converge
+    assert(alice.root)
+    assert(bob.root)
+    assert.equal(alice.root.toString(), bob.root.toString())
+  })
+})
+
+describe('CRDT delete', () => {
+  it('delete a key', async () => {
+    const blocks = new Blockstore()
+    const alice = new TestPail(blocks, [])
+
+    await alice.put('apple', await randomCID(32))
+    await alice.put('banana', await randomCID(32))
+    const { event } = await alice.del('apple')
+
+    assert(event)
+    assert.equal(event.value.data.type, 'del')
+    assert.equal(event.value.data.key, 'apple')
+
+    const value = await alice.get('apple')
+    assert.equal(value, undefined)
+
+    // other key unaffected
+    const banana = await alice.get('banana')
+    assert(banana)
+  })
+
+  it('delete non-existent key is a no-op', async () => {
+    const blocks = new Blockstore()
+    const alice = new TestPail(blocks, [])
+
+    const { root: r0 } = await alice.put('apple', await randomCID(32))
+    const { root: r1, additions, removals } = await alice.del('nonexistent')
+
+    assert.equal(r1.toString(), r0.toString())
+    assert.equal(additions.length, 0)
+    assert.equal(removals.length, 0)
+  })
+})
+
+describe('CRDT concurrent deletes', () => {
+  it('put wins over concurrent delete of same key', async () => {
+    const blocks = new Blockstore()
+    const alice = new TestPail(blocks, [])
+
+    const value0 = await randomCID(32)
+    await alice.put('apple', value0)
+    await alice.put('banana', await randomCID(32))
+
+    const bob = new TestPail(blocks, alice.head)
+
+    // alice puts new value for apple
+    const value1 = await randomCID(32)
+    const { event: aEvent } = await alice.put('apple', value1)
+
+    // bob deletes apple
+    const { event: bEvent } = await bob.del('apple')
+
+    assert(aEvent)
+    assert(bEvent)
+
+    // merge both directions
+    await alice.advance(bEvent.cid)
+    await bob.advance(aEvent.cid)
+
+    // put wins: apple should have alice's new value
+    const aValue = await alice.get('apple')
+    assert(aValue)
+    assert.equal(aValue.toString(), value1.toString())
+
+    const bValue = await bob.get('apple')
+    assert(bValue)
+    assert.equal(bValue.toString(), value1.toString())
+
+    // roots should converge
+    assert(alice.root)
+    assert(bob.root)
+    assert.equal(alice.root.toString(), bob.root.toString())
+  })
+
+  it('concurrent duplicate deletes collapse to single delete', async () => {
+    const blocks = new Blockstore()
+    const alice = new TestPail(blocks, [])
+
+    await alice.put('apple', await randomCID(32))
+    await alice.put('banana', await randomCID(32))
+
+    const bob = new TestPail(blocks, alice.head)
+
+    // both delete apple
+    const { event: aEvent } = await alice.del('apple')
+    const { event: bEvent } = await bob.del('apple')
+
+    assert(aEvent)
+    assert(bEvent)
+
+    // merge
+    await alice.advance(bEvent.cid)
+    await bob.advance(aEvent.cid)
+
+    // apple should be gone
+    const aValue = await alice.get('apple')
+    assert.equal(aValue, undefined)
+
+    const bValue = await bob.get('apple')
+    assert.equal(bValue, undefined)
+
+    // banana should still exist
+    assert(await alice.get('banana'))
+    assert(await bob.get('banana'))
+
+    // roots should converge
+    assert(alice.root)
+    assert(bob.root)
+    assert.equal(alice.root.toString(), bob.root.toString())
+  })
+})
+
 class TestPail {
   /**
    * @param {Blockstore} blocks
@@ -272,6 +553,16 @@ class TestPail {
     return this.head
   }
 
+  /** @param {string} key */
+  async del (key) {
+    const result = await del(this.blocks, this.head, key)
+    if (result.event) this.blocks.putSync(result.event.cid, result.event.bytes)
+    result.additions.forEach(a => this.blocks.putSync(a.cid, a.bytes))
+    this.head = result.head
+    this.root = (await root(this.blocks, this.head)).root
+    return result
+  }
+
   /**
    * @param {string} key
    * @param {API.UnknownLink} value
@@ -286,12 +577,16 @@ class TestPail {
   }
 
   /**
-   * @param {Array<{ key: string, value: API.UnknownLink }>} items
+   * @param {Array<{ type?: string, key: string, value?: API.UnknownLink }>} ops
    */
-  async putBatch (items) {
+  async applyBatch (ops) {
     const batch = await Batch.create(this.blocks, this.head)
-    for (const { key, value } of items) {
-      await batch.put(key, value)
+    for (const op of ops) {
+      if (!op.type || op.type === 'put') {
+        await batch.put(op.key, /** @type {API.UnknownLink} */ (op.value))
+      } else if (op.type === 'del') {
+        await batch.del(op.key)
+      }
     }
     const result = await batch.commit()
     if (result.event) this.blocks.putSync(result.event.cid, result.event.bytes)
@@ -299,6 +594,13 @@ class TestPail {
     this.head = result.head
     this.root = (await root(this.blocks, this.head)).root
     return result
+  }
+
+  /**
+   * @param {Array<{ key: string, value: API.UnknownLink }>} items
+   */
+  async putBatch (items) {
+    return this.applyBatch(items.map(i => ({ type: 'put', ...i })))
   }
 
   async vis () {

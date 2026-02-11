@@ -105,6 +105,108 @@ describe('batch', () => {
     await expect(async () => batch.commit()).rejects.toThrowError(/batch already committed/)
   })
 
+  it('batches dels', async () => {
+    const rootblk = await ShardBlock.create()
+    const blocks = new Blockstore()
+    await blocks.put(rootblk.cid, rootblk.bytes)
+
+    // put some keys
+    const keys = []
+    for (let i = 0; i < 10; i++) {
+      keys.push(`test${randomString(10)}`)
+    }
+    /** @type {API.ShardLink} */
+    let current = rootblk.cid
+    for (const key of keys) {
+      const { root, additions } = await Pail.put(blocks, current, key, await randomCID())
+      current = root
+      for (const b of additions) blocks.putSync(b.cid, b.bytes)
+    }
+
+    // batch-delete the first 5
+    const batch = await Batch.create(blocks, current)
+    for (const key of keys.slice(0, 5)) {
+      await batch.del(key)
+    }
+    const { root, additions, removals } = await batch.commit()
+
+    for (const b of removals) blocks.deleteSync(b.cid)
+    for (const b of additions) blocks.putSync(b.cid, b.bytes)
+
+    // deleted keys should be gone
+    for (const key of keys.slice(0, 5)) {
+      const value = await Pail.get(blocks, root, key)
+      assert.equal(value, undefined)
+    }
+
+    // remaining keys should still exist
+    for (const key of keys.slice(5)) {
+      const value = await Pail.get(blocks, root, key)
+      assert(value)
+    }
+  })
+
+  it('mixed put and del in same batch', async () => {
+    const rootblk = await ShardBlock.create()
+    const blocks = new Blockstore()
+    await blocks.put(rootblk.cid, rootblk.bytes)
+
+    // put initial keys
+    /** @type {API.ShardLink} */
+    let current = rootblk.cid
+    const value0 = await randomCID()
+    const res0 = await Pail.put(blocks, current, 'apple', value0)
+    current = res0.root
+    for (const b of res0.additions) blocks.putSync(b.cid, b.bytes)
+
+    const res1 = await Pail.put(blocks, current, 'banana', await randomCID())
+    current = res1.root
+    for (const b of res1.additions) blocks.putSync(b.cid, b.bytes)
+
+    // batch: delete apple, put cherry
+    const cherryValue = await randomCID()
+    const batch = await Batch.create(blocks, current)
+    await batch.del('apple')
+    await batch.put('cherry', cherryValue)
+    const { root, additions, removals } = await batch.commit()
+
+    for (const b of removals) blocks.deleteSync(b.cid)
+    for (const b of additions) blocks.putSync(b.cid, b.bytes)
+
+    assert.equal(await Pail.get(blocks, root, 'apple'), undefined)
+    assert(await Pail.get(blocks, root, 'banana'))
+    const cherry = await Pail.get(blocks, root, 'cherry')
+    assert(cherry)
+    assert.equal(cherry.toString(), cherryValue.toString())
+  })
+
+  it('del non-existent key is a no-op', async () => {
+    const rootblk = await ShardBlock.create()
+    const blocks = new Blockstore()
+    await blocks.put(rootblk.cid, rootblk.bytes)
+
+    const { root: r0, additions: a0 } = await Pail.put(blocks, rootblk.cid, 'apple', await randomCID())
+    for (const b of a0) blocks.putSync(b.cid, b.bytes)
+
+    const batch = await Batch.create(blocks, r0)
+    await batch.del('nonexistent')
+    const { root } = await batch.commit()
+
+    // root should be unchanged
+    assert.equal(root.toString(), r0.toString())
+  })
+
+  it('error when del after commit', async () => {
+    const root = await ShardBlock.create()
+    const blocks = new Blockstore()
+    await blocks.put(root.cid, root.bytes)
+
+    const batch = await Batch.create(blocks, root.cid)
+    await batch.put('test', await randomCID())
+    await batch.commit()
+    await expect(async () => batch.del('test')).rejects.toThrowError(/batch already committed/)
+  })
+
   it('traverses existing shards to put values', async () => {
     const rootblk = await ShardBlock.create()
     const blocks = new Blockstore()
