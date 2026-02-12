@@ -64,7 +64,7 @@ export const del = async (blocks, head, key) => {
  *
  * @param {API.BlockFetcher} blocks Bucket block storage.
  * @param {API.EventLink<API.Operation>[]} head Merkle clock head.
- * @param {object} op Operation data (without root).
+ * @param {API.PutOperation | API.DeleteOperation} op Operation data (without root).
  * @param {(blocks: API.BlockFetcher, root: API.ShardLink) => Promise<{ root: API.ShardLink } & API.ShardDiff>} fn
  * @returns {Promise<API.Result>}
  */
@@ -167,12 +167,12 @@ export const root = async (blocks, head) => {
         } else if (op.type === 'del') {
           await batch.del(op.key)
         } else {
-          throw new Error(`unsupported batch operation: ${op.type}`)
+          throw new Error(`unsupported batch operation: ${/** @type {any} */ (op).type}`)
         }
       }
       result = await batch.commit()
     } else {
-      throw new Error(`unknown operation: ${event.data.type}`)
+      throw new Error(`unknown operation: ${/** @type {any} */ (event.data).type}`)
     }
 
     root = result.root
@@ -330,9 +330,10 @@ const findSortedEvents = async (events, head, tail) => {
   // sort by weight, and by CID within weight
   return Array.from(buckets)
     .sort((a, b) => b[0] - a[0])
-    .map(([level, events]) => [level, removeConcurrentDeletes(events)])
-    .flatMap(([, es]) =>
-      es.sort((a, b) => (String(a.cid) < String(b.cid) ? -1 : 1))
+    .flatMap(([, events]) =>
+      removeConcurrentDeletes(events).sort((a, b) =>
+        String(a.cid) < String(b.cid) ? -1 : 1
+      )
     )
 }
 
@@ -347,6 +348,7 @@ const removeConcurrentDeletes = (events) => {
   // Simplify batch events: within a batch, ops are ordered so only the last
   // operation per key represents the net effect. e.g. [put a, put b, del a]
   // simplifies to [put b, del a] — the earlier put a is overridden.
+  // @ts-expect-error creating modified views with simplified ops
   events = events.map((event) => {
     const { data } = event.value
     if (data.type !== 'batch') return event
@@ -357,7 +359,6 @@ const removeConcurrentDeletes = (events) => {
     }
     const simplified = data.ops.filter((op, i) => lastIndex.get(op.key) === i)
     if (simplified.length === data.ops.length) return event
-    // @ts-expect-error creating a modified view with simplified ops
     return {
       cid: event.cid,
       bytes: event.bytes,

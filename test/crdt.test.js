@@ -431,6 +431,7 @@ describe('CRDT delete', () => {
 
     assert(event)
     assert.equal(event.value.data.type, 'del')
+    // @ts-expect-error TS can't narrow discriminated union through assert.equal
     assert.equal(event.value.data.key, 'apple')
 
     const value = await alice.get('apple')

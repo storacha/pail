@@ -192,7 +192,7 @@ export const del = async (blocks, shard, key) => {
     // cannot delete a shard-only entry (no value)
     if (entry[1][1] == null) return
     // remove value but keep shard link
-    dest.shard.entries[entryidx] = [entry[0], [entry[1][0]]]
+    dest.shard.entries[entryidx] = [entry[0], /** @type {API.ShardEntryLinkValue | API.ShardEntryShardValue} */ ([entry[1][0]])]
   } else {
     // remove the entry entirely
     dest.shard.entries.splice(entryidx, 1)
