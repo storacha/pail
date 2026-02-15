@@ -167,12 +167,16 @@ export const root = async (blocks, head) => {
         } else if (op.type === 'del') {
           await batch.del(op.key)
         } else {
-          throw new Error(`unsupported batch operation: ${/** @type {any} */ (op).type}`)
+          throw new Error(
+            `unsupported batch operation: ${/** @type {any} */ (op).type}`
+          )
         }
       }
       result = await batch.commit()
     } else {
-      throw new Error(`unknown operation: ${/** @type {any} */ (event.data).type}`)
+      throw new Error(
+        `unknown operation: ${/** @type {any} */ (event.data).type}`
+      )
     }
 
     root = result.root
@@ -241,7 +245,7 @@ export const entries = async function * (blocks, head, options) {
  * @param {EventFetcher<API.Operation>} events
  * @param  {API.EventLink<API.Operation>[]} children
  */
-const findCommonAncestor = async (events, children) => {
+export const findCommonAncestor = async (events, children) => {
   if (!children.length) return
   const candidates = children.map((c) => [c])
   while (true) {
@@ -295,7 +299,7 @@ const findCommonString = (arrays) => {
  * @param {API.EventLink<API.Operation>[]} head
  * @param {API.EventLink<API.Operation>} tail
  */
-const findSortedEvents = async (events, head, tail) => {
+export const findSortedEvents = async (events, head, tail) => {
   if (head.length === 1 && head[0].toString() === tail.toString()) {
     return []
   }
