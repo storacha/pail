@@ -86,6 +86,14 @@ export interface KeyUpperBoundRangeInclusiveOption {
   lte: string
 }
 
+export interface KeyOrderOption {
+  /** Order to return results: 'asc' for ascending (default), 'desc' for descending. */
+  order: 'asc' | 'desc'
+}
+
 export type EntriesOptions =
   | KeyPrefixOption
   | KeyRangeOption
+  | KeyOrderOption
+  | (KeyPrefixOption & KeyOrderOption)
+  | (KeyRangeOption & KeyOrderOption)

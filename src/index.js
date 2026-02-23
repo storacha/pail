@@ -295,6 +295,15 @@ const isKeyUpperBoundRangeInclusiveOption = options => 'lte' in options && Boole
 const isKeyUpperBoundRangeExclusiveOption = options => 'lt' in options && Boolean(options.lt)
 
 /**
+ * @param {API.EntriesOptions} [options]
+ * @returns {options is API.KeyOrderOption}
+ */
+const isKeyOrderOption = options => {
+  const opts = options ?? {}
+  return 'order' in opts && (opts.order === 'asc' || opts.order === 'desc')
+}
+
+/**
  * List entries in the bucket.
  *
  * @param {API.BlockFetcher} blocks Bucket block storage.
@@ -305,6 +314,8 @@ const isKeyUpperBoundRangeExclusiveOption = options => 'lt' in options && Boolea
 export const entries = async function * (blocks, root, options) {
   const hasKeyPrefix = isKeyPrefixOption(options)
   const hasKeyRange = isKeyRangeOption(options)
+  const hasKeyOrder = isKeyOrderOption(options)
+  const isDescending = hasKeyOrder && options.order === 'desc'
   const hasKeyLowerBoundRange = hasKeyRange && isKeyLowerBoundRangeOption(options)
   const hasKeyLowerBoundRangeInclusive = hasKeyLowerBoundRange && isKeyLowerBoundRangeInclusiveOption(options)
   const hasKeyLowerBoundRangeExclusive = hasKeyLowerBoundRange && isKeyLowerBoundRangeExclusiveOption(options)
@@ -319,7 +330,12 @@ export const entries = async function * (blocks, root, options) {
   yield * (
     /** @returns {AsyncIterableIterator<API.ShardValueEntry>} */
     async function * ents (shard) {
-      for (const entry of shard.value.entries) {
+      const entriesLength = shard.value.entries.length
+
+      for (let idx = 0; idx < entriesLength; idx++) {
+        // Calculate the actual index based on order
+        const i = isDescending ? entriesLength - 1 - idx : idx
+        const entry = shard.value.entries[i]
         const key = shard.value.prefix + entry[0]
 
         // if array, this is a link to a shard
