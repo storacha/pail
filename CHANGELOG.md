@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/storacha/pail/compare/v0.6.2...v0.7.0) (2026-02-23)
+
+
+### Features
+
+* add suport for entries() returning results in descending order ([#46](https://github.com/storacha/pail/issues/46)) ([8ad9853](https://github.com/storacha/pail/commit/8ad98537ac35044b6057c20139edd3d6a76dbc2a))
+
 ## [0.6.2](https://github.com/storacha/pail/compare/v0.6.1...v0.6.2) (2025-04-04)
 
 
