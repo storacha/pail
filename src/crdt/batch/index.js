@@ -54,6 +54,16 @@ class Batcher {
     this.ops.push({ type: 'put', key, value })
   }
 
+  /**
+   * @param {string} key The key of the value to delete.
+   * @returns {Promise<void>}
+   */
+  async del (key) {
+    if (this.#committed) throw new BatchCommittedError()
+    await Batch.del(this.blocks, this, key)
+    this.ops.push({ type: 'del', key })
+  }
+
   async commit () {
     if (this.#committed) throw new BatchCommittedError()
     this.#committed = true
