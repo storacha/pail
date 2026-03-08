@@ -128,7 +128,25 @@ export const put = async (blocks, head, key, value) => {
  * @returns {Promise<API.Result>}
  */
 export const del = async (blocks, head, key, options) => {
-  throw new Error('not implemented')
+  const mblocks = new MemoryBlockstore()
+  blocks = new MultiBlockFetcher(mblocks, blocks)
+
+  if (!head.length) {
+    const shard = await ShardBlock.create()
+    mblocks.putSync(shard.cid, shard.bytes)
+    const result = await Pail.put(blocks, shard.cid, key, value)
+    /** @type {API.Operation} */
+    const data = { type: 'put', root: result.root, key, value }
+    const event = await EventBlock.create(data, head)
+    head = await Clock.advance(blocks, head, event.cid)
+    return {
+      root: result.root,
+      additions: [shard, ...result.additions],
+      removals: result.removals,
+      head,
+      event
+    }
+  }
 }
 
 /**
