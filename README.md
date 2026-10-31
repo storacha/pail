@@ -20,11 +20,17 @@ npm install @web3-storage/pail
 import { put, get, del } from '@web3-storage/pail'
 import { ShardBlock } from '@web3-storage/pail/shard'
 import { MemoryBlockstore } from '@web3-storage/pail/block'
+import * as Link from 'multiformats/link'
+import * as raw from 'multiformats/codecs/raw'
+import { sha256 } from 'multiformats/hashes/sha2'
 
 // Initialize a new bucket
 const blocks = new MemoryBlockstore()
 const init = await ShardBlock.create() // empty root shard
 await blocks.put(init.cid, init.bytes)
+
+// A value to store: a CID, built the same way as in test/helpers.js
+const dataCID0 = Link.create(raw.code, await sha256.digest(new TextEncoder().encode('data0')))
 
 // Add a key and value to the bucket
 const { root, additions, removals } = await put(blocks, init.cid, 'path/to/data0', dataCID0)
